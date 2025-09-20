@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% block content %}
+{% load static %}
+
+<h1>Job Listings</h1>
+
+<!-- Filter form -->
+{% if user.is_authenticated and user.role == 'seeker' %}
+<form method="GET" class="mb-4">
+    <div class="row g-2">
+        <div class="col-md-2">
+            <input type="text" name="title" placeholder="Title" class="form-control" value="{{ template_data.filters.title }}">
+        </div>
+        <div class="col-md-2">
+            <input type="text" name="skills" placeholder="Skills (comma separated)" class="form-control" value="{{ template_data.filters.skills }}">
+        </div>
+        <div class="col-md-2">
+            <input type="text" name="location" placeholder="Location" class="form-control" value="{{ template_data.filters.location }}">
+        </div>
+        <div class="col-md-1">
+            <input type="number" name="min_salary" placeholder="Min $" class="form-control" value="{{ template_data.filters.min_salary }}">
+        </div>
+        <div class="col-md-1">
+            <input type="number" name="max_salary" placeholder="Max $" class="form-control" value="{{ template_data.filters.max_salary }}">
+        </div>
+        <div class="col-md-2">
+            <select name="remote_or_on_site" class="form-control">
+                <option value="">Any</option>
+                <option value="on_site" {% if template_data.filters.remote_or_on_site == 'on_site' %}selected{% endif %}>On-site</option>
+                <option value="remote" {% if template_data.filters.remote_or_on_site == 'remote' %}selected{% endif %}>Remote</option>
+                <option value="hybrid" {% if template_data.filters.remote_or_on_site == 'hybrid' %}selected{% endif %}>Hybrid</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select name="visa_sponsorship" class="form-control">
+                <option value="">Any</option>
+                <option value="yes" {% if template_data.filters.visa_sponsorship == 'yes' %}selected{% endif %}>Yes</option>
+                <option value="no" {% if template_data.filters.visa_sponsorship == 'no' %}selected{% endif %}>No</option>
+            </select>
+        </div>
+        <div class="col-md-12 mt-2">
+            <button type="submit" class="btn btn-primary">Filter</button>
+            <a href="{% url 'jobs.index' %}" class="btn btn-secondary">Reset</a>
+        </div>
+    </div>
+</form>
+{% endif %}
+<!-- Recruiter: create a job -->
+{% if user.is_authenticated and user.role == 'recruiter' %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8">
+            <div class="card shadow p-3 mb-4 rounded">
+                <div class="card-body">
+                    <b>Create a Job Posting</b><br /><br />
+                    <form method="POST" action="{% url 'jobs.create_job' %}">
+                        {% csrf_token %}
+                        <!-- Job form fields as before -->
+                        <p><label for="title">Job Title:</label>
+                        <input type="text" name="title" required class="form-control" id="title"></p>
+
+                        <p><label for="skills">Skills (comma separated):</label>
+                        <textarea name="skills" required class="form-control" id="skills"></textarea></p>
+
+                        <p><label for="salary">Salary (optional):</label>
+                        <input type="number" name="salary" step="0.01" class="form-control" id="salary"></p>
+
+                        <p><label for="location">Location (optional):</label>
+                        <input type="text" name="location" class="form-control" id="location"></p>
+
+                        <p><label for="remote_or_on_site">Remote / On-site:</label>
+                        <select name="remote_or_on_site" class="form-control" id="remote_or_on_site">
+                            <option value="on_site">On-site</option>
+                            <option value="remote">Remote</option>
+                            <option value="hybrid">Hybrid</option>
+                        </select></p>
+
+                        <p><label for="visa_sponsorship">Visa Sponsorship:</label>
+                        <select name="visa_sponsorship" class="form-control" id="visa_sponsorship">
+                            <option value="no">No</option>
+                            <option value="yes">Yes</option>
+                        </select></p>
+
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary">Create Job</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Job listings -->
+<div class="job-listings">
+    {% if template_data.jobs %}
+        {% for job in template_data.jobs %}
+            <div class="card mb-2 p-3">
+                <h3>{{ job.title }}</h3>
+                <p><strong>Skills:</strong> {{ job.skills }}</p>
+                <p><strong>Location:</strong> {{ job.location }}</p>
+                <p><strong>Remote/On-site:</strong> {{ job.remote_or_on_site|capfirst }}</p>
+                <p><strong>Visa Sponsorship:</strong> {{ job.visa_sponsorship|capfirst }}</p>
+                <p><strong>Salary:</strong>
+                    {% if job.salary %} ${{ job.salary }} {% else %} Not listed {% endif %}
+                </p>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No job postings available.</p>
+    {% endif %}
+</div>
+
+{% endblock content %}
