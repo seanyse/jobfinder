@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Edit Job</h1>
+
+<form method="POST">
+    {% csrf_token %}
+
+    <p>
+        <label for="title">Job Title:</label>
+        <input type="text" name="title" id="title" class="form-control" value="{{ template_data.job.title }}" required>
+    </p>
+
+    <p>
+        <label for="skills">Skills (comma separated):</label>
+        <textarea name="skills" id="skills" class="form-control" required>{{ template_data.job.skills }}</textarea>
+    </p>
+
+    <p>
+        <label for="salary">Salary (optional):</label>
+        <input type="number" name="salary" id="salary" class="form-control" step="0.01" value="{{ template_data.job.salary }}">
+    </p>
+
+    <p>
+        <label for="location">Location (optional):</label>
+        <input type="text" name="location" id="location" class="form-control" value="{{ template_data.job.location }}">
+    </p>
+
+    <p>
+        <label for="remote_or_on_site">Remote / On-site:</label>
+        <select name="remote_or_on_site" id="remote_or_on_site" class="form-control">
+            <option value="on_site" {% if template_data.job.remote_or_on_site == 'on_site' %}selected{% endif %}>On-site</option>
+            <option value="remote" {% if template_data.job.remote_or_on_site == 'remote' %}selected{% endif %}>Remote</option>
+            <option value="hybrid" {% if template_data.job.remote_or_on_site == 'hybrid' %}selected{% endif %}>Hybrid</option>
+        </select>
+    </p>
+
+    <p>
+        <label for="visa_sponsorship">Visa Sponsorship:</label>
+        <select name="visa_sponsorship" id="visa_sponsorship" class="form-control">
+            <option value="no" {% if template_data.job.visa_sponsorship == 'no' %}selected{% endif %}>No</option>
+            <option value="yes" {% if template_data.job.visa_sponsorship == 'yes' %}selected{% endif %}>Yes</option>
+        </select>
+    </p>
+
+    <div class="text-center mt-3">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a href="{% url 'jobs.index' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock content %}

@@ -8,36 +8,44 @@
 {% if user.is_authenticated and user.role == 'seeker' %}
 <form method="GET" class="mb-4">
     <div class="row g-2">
-        <div class="col-md-2">
-            <input type="text" name="title" placeholder="Title" class="form-control" value="{{ template_data.filters.title }}">
-        </div>
-        <div class="col-md-2">
-            <input type="text" name="skills" placeholder="Skills (comma separated)" class="form-control" value="{{ template_data.filters.skills }}">
-        </div>
-        <div class="col-md-2">
-            <input type="text" name="location" placeholder="Location" class="form-control" value="{{ template_data.filters.location }}">
-        </div>
-        <div class="col-md-1">
-            <input type="number" name="min_salary" placeholder="Min $" class="form-control" value="{{ template_data.filters.min_salary }}">
-        </div>
-        <div class="col-md-1">
-            <input type="number" name="max_salary" placeholder="Max $" class="form-control" value="{{ template_data.filters.max_salary }}">
-        </div>
-        <div class="col-md-2">
-            <select name="remote_or_on_site" class="form-control">
-                <option value="">Any</option>
-                <option value="on_site" {% if template_data.filters.remote_or_on_site == 'on_site' %}selected{% endif %}>On-site</option>
-                <option value="remote" {% if template_data.filters.remote_or_on_site == 'remote' %}selected{% endif %}>Remote</option>
-                <option value="hybrid" {% if template_data.filters.remote_or_on_site == 'hybrid' %}selected{% endif %}>Hybrid</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <select name="visa_sponsorship" class="form-control">
-                <option value="">Any</option>
-                <option value="yes" {% if template_data.filters.visa_sponsorship == 'yes' %}selected{% endif %}>Yes</option>
-                <option value="no" {% if template_data.filters.visa_sponsorship == 'no' %}selected{% endif %}>No</option>
-            </select>
-        </div>
+    <div class="col-md-2">
+        <label for="title" class="form-label">Job Title</label>
+        <input type="text" name="title" id="title" placeholder="Title" class="form-control" value="{{ template_data.filters.title }}">
+    </div>
+    <div class="col-md-2">
+        <label for="skills" class="form-label">Skills</label>
+        <input type="text" name="skills" id="skills" placeholder="Skills (comma separated)" class="form-control" value="{{ template_data.filters.skills }}">
+    </div>
+    <div class="col-md-2">
+        <label for="location" class="form-label">Location</label>
+        <input type="text" name="location" id="location" placeholder="Location" class="form-control" value="{{ template_data.filters.location }}">
+    </div>
+    <div class="col-md-1">
+        <label for="min_salary" class="form-label">Min Salary</label>
+        <input type="number" name="min_salary" id="min_salary" placeholder="Min $" class="form-control" value="{{ template_data.filters.min_salary }}">
+    </div>
+    <div class="col-md-1">
+        <label for="max_salary" class="form-label">Max Salary</label>
+        <input type="number" name="max_salary" id="max_salary" placeholder="Max $" class="form-control" value="{{ template_data.filters.max_salary }}">
+    </div>
+    <div class="col-md-2">
+    <label for="remote_or_on_site" class="form-label">Remote / On-site</label>
+    <select name="remote_or_on_site" id="remote_or_on_site" class="form-control">
+        <option value="">Any</option>
+        <option value="on_site" {% if template_data.filters.remote_or_on_site == 'on_site' %}selected{% endif %}>On-site</option>
+        <option value="remote" {% if template_data.filters.remote_or_on_site == 'remote' %}selected{% endif %}>Remote</option>
+        <option value="hybrid" {% if template_data.filters.remote_or_on_site == 'hybrid' %}selected{% endif %}>Hybrid</option>
+    </select>
+</div>
+
+<div class="col-md-2">
+    <label for="visa_sponsorship" class="form-label">Visa Sponsorship</label>
+    <select name="visa_sponsorship" id="visa_sponsorship" class="form-control">
+        <option value="">Any</option>
+        <option value="yes" {% if template_data.filters.visa_sponsorship == 'yes' %}selected{% endif %}>Yes</option>
+        <option value="no" {% if template_data.filters.visa_sponsorship == 'no' %}selected{% endif %}>No</option>
+    </select>
+</div>
         <div class="col-md-12 mt-2">
             <button type="submit" class="btn btn-primary">Filter</button>
             <a href="{% url 'jobs.index' %}" class="btn btn-secondary">Reset</a>
@@ -105,7 +113,12 @@
                 <p><strong>Salary:</strong>
                     {% if job.salary %} ${{ job.salary }} {% else %} Not listed {% endif %}
                 </p>
+                {% if user.is_authenticated and user.role == 'recruiter' and job.posted_by == user %}
+                <a href="{% url 'jobs.edit_job' job_id=job.id %}" class="btn btn-secondary">Edit</a>
+                <a href="{% url 'jobs.delete_job' job_id=job.id %}" class="btn btn-secondary">Delete</a>
+            {% endif %}
             </div>
+            
         {% endfor %}
     {% else %}
         <p>No job postings available.</p>
