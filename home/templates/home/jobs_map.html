@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+
+<div class="container my-4">
+  <h1 class="mb-3">Jobs Near Me</h1>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-9">
+      <div id="map" style="height: 520px; border-radius: 12px;"></div>
+    </div>
+    <div class="col-12 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <h5>Filters</h5>
+          <label class="form-label" for="radius">Radius (km)</label>
+          <input id="radius" type="number" class="form-control" value="50" min="1" step="1" />
+          <button id="reload" class="btn btn-primary mt-2 w-100">Search Near Me</button>
+          <hr/>
+          <div id="results" style="max-height: 350px; overflow:auto;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let map, userMarker, jobsLayer;
+
+function initMap(lat=33.7756, lng=-84.3963, zoom=12) { // default: Georgia Tech-ish
+  map = L.map('map').setView([lat, lng], zoom);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 20,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+  userMarker = L.marker([lat, lng], {title: 'You'}).addTo(map)
+               .bindPopup('You are here').openPopup();
+  jobsLayer = L.layerGroup().addTo(map);
+}
+
+async function loadJobs(lat, lng, radiusKm) {
+  jobsLayer.clearLayers();
+  document.getElementById('results').innerHTML = 'Loading...';
+
+  const params = new URLSearchParams({ lat, lng, radius_km: radiusKm });
+  const resp = await fetch(`/api/jobs/?${params.toString()}`);
+  const data = await resp.json();
+
+  const list = [];
+  data.jobs.forEach(j => {
+    const marker = L.marker([j.lat, j.lng]).addTo(jobsLayer);
+    const dist = (j.distance_km !== undefined) ? `<div><b>Distance:</b> ${j.distance_km} km</div>` : '';
+    marker.bindPopup(`
+      <div style="min-width:220px">
+        <div><b>${j.title}</b></div>
+        <div>${j.company ?? ''}</div>
+        <div>${j.city ?? ''} ${j.state ?? ''}</div>
+        ${dist}
+        <hr style="margin:6px 0"/>
+        <div style="font-size: 0.9rem;">${(j.description || '').slice(0,140)}${(j.description||'').length>140?'…':''}</div>
+      </div>
+    `);
+    list.push(`
+      <div class="mb-2">
+        <div><b>${j.title}</b> ${j.company ? '· ' + j.company : ''}</div>
+        <div style="font-size:0.9rem">${j.city ?? ''} ${j.state ?? ''} ${j.distance_km !== undefined ? `· ${j.distance_km} km` : ''}</div>
+      </div>
+      <hr/>
+    `);
+  });
+
+  document.getElementById('results').innerHTML = list.length ? list.join('') : 'No jobs found in this radius.';
+}
+
+function getRadius() {
+  return parseFloat(document.getElementById('radius').value) || 50;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+
+  // Try to use the user's geolocation
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude, longitude } = pos.coords;
+      map.setView([latitude, longitude], 13);
+      userMarker.setLatLng([latitude, longitude]);
+      await loadJobs(latitude, longitude, getRadius());
+    }, async () => {
+      // permission denied → load all jobs without filtering
+      await loadJobs(33.7756, -84.3963, getRadius());
+    });
+  } else {
+    loadJobs(33.7756, -84.3963, getRadius());
+  }
+
+  document.getElementById('reload').addEventListener('click', async () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        userMarker.setLatLng([latitude, longitude]);
+        map.setView([latitude, longitude], 13);
+        await loadJobs(latitude, longitude, getRadius());
+      }, async () => {
+        await loadJobs(33.7756, -84.3963, getRadius());
+      });
+    } else {
+      await loadJobs(33.7756, -84.3963, getRadius());
+    }
+  });
+});
+</script>
+
+{% endblock content %}
+
