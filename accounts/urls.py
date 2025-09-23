@@ -4,4 +4,8 @@ urlpatterns = [
     path('signup', views.signup, name='accounts.signup'),
     path('login/', views.login, name='accounts.login'),
     path('logout/', views.logout, name='accounts.logout'),
+
+    path('profile/me/', views.profile_edit, name='accounts.profile_edit'),
+    path('profile/<str:username>/', views.profile_detail, name='accounts.profile_detail'),
+    path('recruiter/search/', views.candidate_search, name='accounts.candidate_search'),
 ]
