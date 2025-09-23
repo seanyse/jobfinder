@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <!-- Job Details Card -->
+        <div class="col-12 col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h1 class="card-title">{{ template_data.job.title }}</h1>
+                        <a href="{% url 'jobs.index' %}" class="btn btn-outline-secondary">← Back to Jobs</a>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p><strong>Company:</strong> {{ template_data.job.posted_by.username }}</p>
+                            <p><strong>Location:</strong> {{ template_data.job.location|default:"Not specified" }}</p>
+                            <p><strong>Work Type:</strong> {{ template_data.job.remote_or_on_site|capfirst }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Visa Sponsorship:</strong> {{ template_data.job.visa_sponsorship|capfirst }}</p>
+                            <p><strong>Salary:</strong> 
+                                {% if template_data.job.salary %}
+                                    ${{ template_data.job.salary|floatformat:0 }}
+                                {% else %}
+                                    Not listed
+                                {% endif %}
+                            </p>
+                            <p><strong>Posted:</strong> {{ template_data.job.created_at|date:"M d, Y" }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5>Required Skills:</h5>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for skill in template_data.job.skills|split:"," %}
+                                <span class="badge bg-secondary">{{ skill|strip }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Application Status/Actions Card -->
+        <div class="col-12 col-lg-4">
+            {% if user.role == 'seeker' %}
+                <div class="card shadow mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Application Status</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if template_data.user_application %}
+                            <!-- User has applied - show status -->
+                            <div class="text-center mb-3">
+                                <span class="badge 
+                                    {% if template_data.user_application.status == 'applied' %}bg-primary
+                                    {% elif template_data.user_application.status == 'review' %}bg-warning
+                                    {% elif template_data.user_application.status == 'interview' %}bg-info
+                                    {% elif template_data.user_application.status == 'offer' %}bg-success
+                                    {% elif template_data.user_application.status == 'closed' %}bg-secondary
+                                    {% endif %} fs-5 p-2">
+                                    {{ template_data.user_application.get_status_display }}
+                                </span>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <small class="text-muted">
+                                    <strong>Applied:</strong> {{ template_data.user_application.applied_at|date:"M d, Y g:i A" }}<br>
+                                    <strong>Last Updated:</strong> {{ template_data.user_application.updated_at|date:"M d, Y g:i A" }}
+                                </small>
+                            </div>
+                            
+                            {% if template_data.user_application.cover_letter %}
+                                <div class="border-top pt-3">
+                                    <h6>Your Cover Letter:</h6>
+                                    <div class="bg-light p-3 rounded" style="max-height: 200px; overflow-y: auto;">
+                                        {{ template_data.user_application.cover_letter|linebreaks }}
+                                    </div>
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Status Timeline -->
+                            <div class="border-top pt-3 mt-3">
+                                <h6>Application Progress:</h6>
+                                <div class="progress-steps">
+                                    {% with current_status=template_data.user_application.status %}
+                                        <div class="step {% if current_status == 'applied' or current_status == 'review' or current_status == 'interview' or current_status == 'offer' %}completed{% endif %}">
+                                            <span class="step-icon">1</span>
+                                            <span class="step-text">Applied</span>
+                                        </div>
+                                        <div class="step {% if current_status == 'review' or current_status == 'interview' or current_status == 'offer' %}completed{% endif %}">
+                                            <span class="step-icon">2</span>
+                                            <span class="step-text">Under Review</span>
+                                        </div>
+                                        <div class="step {% if current_status == 'interview' or current_status == 'offer' %}completed{% endif %}">
+                                            <span class="step-icon">3</span>
+                                            <span class="step-text">Interview</span>
+                                        </div>
+                                        <div class="step {% if current_status == 'offer' %}completed{% endif %}">
+                                            <span class="step-icon">4</span>
+                                            <span class="step-text">Offer</span>
+                                        </div>
+                                    {% endwith %}
+                                </div>
+                            </div>
+                        {% else %}
+                            <!-- User hasn't applied yet -->
+                            <div class="text-center">
+                                <p class="mb-3">You haven't applied to this job yet.</p>
+                                <a href="{% url 'jobs.apply' job_id=template_data.job.id %}" class="btn btn-primary">Apply Now</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% elif user.role == 'recruiter' and template_data.job.posted_by == user %}
+                <!-- Recruiter view - show all applications -->
+                <div class="card shadow mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Applications ({{ template_data.job_applications.count }})</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if template_data.job_applications %}
+                            {% for application in template_data.job_applications %}
+                                <div class="border-bottom mb-3 pb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <strong>{{ application.applicant.username }}</strong>
+                                        <span class="badge 
+                                            {% if application.status == 'applied' %}bg-primary
+                                            {% elif application.status == 'review' %}bg-warning
+                                            {% elif application.status == 'interview' %}bg-info
+                                            {% elif application.status == 'offer' %}bg-success
+                                            {% elif application.status == 'closed' %}bg-secondary
+                                            {% endif %}">
+                                            {{ application.get_status_display }}
+                                        </span>
+                                    </div>
+                                    <small class="text-muted">Applied: {{ application.applied_at|date:"M d, Y" }}</small>
+                                    
+                                    <!-- Quick status update -->
+                                    <form method="POST" action="{% url 'jobs.update_application_status' application.id %}" class="mt-2">
+                                        {% csrf_token %}
+                                        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                                            <option value="applied" {% if application.status == 'applied' %}selected{% endif %}>Applied</option>
+                                            <option value="review" {% if application.status == 'review' %}selected{% endif %}>Under Review</option>
+                                            <option value="interview" {% if application.status == 'interview' %}selected{% endif %}>Interview</option>
+                                            <option value="offer" {% if application.status == 'offer' %}selected{% endif %}>Offer</option>
+                                            <option value="closed" {% if application.status == 'closed' %}selected{% endif %}>Closed</option>
+                                        </select>
+                                    </form>
+                                    
+                                    {% if application.cover_letter %}
+                                        <button class="btn btn-sm btn-outline-secondary mt-2" type="button" 
+                                                data-bs-toggle="collapse" 
+                                                data-bs-target="#cover-{{ application.id }}">
+                                            View Cover Letter
+                                        </button>
+                                        <div class="collapse mt-2" id="cover-{{ application.id }}">
+                                            <div class="card card-body bg-light p-2">
+                                                <small>{{ application.cover_letter|linebreaks }}</small>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center">No applications yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.progress-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    opacity: 0.5;
+}
+
+.step.completed {
+    opacity: 1;
+    font-weight: bold;
+}
+
+.step-icon {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background-color: #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.step.completed .step-icon {
+    background-color: #28a745;
+    color: white;
+}
+</style>
+{% endblock content %}
