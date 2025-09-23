@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>My Profile</h1>
+<form method="post">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <p>{{ form.headline.label_tag }} {{ form.headline }}</p>
+  <p>{{ form.bio.label_tag }} {{ form.bio }}</p>
+  <p>{{ form.location.label_tag }} {{ form.location }}</p>
+  <p>{{ form.website.label_tag }} {{ form.website }}</p>
+  <p>{{ form.github.label_tag }} {{ form.github }}</p>
+  <p>{{ form.linkedin.label_tag }} {{ form.linkedin }}</p>
+  <fieldset>
+    <legend>Skills</legend>
+    {{ form.skills }}
+  </fieldset>
+  <fieldset>
+    <legend>Projects</legend>
+    {{ form.projects }}
+  </fieldset>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}
