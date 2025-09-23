@@ -28,3 +28,25 @@ class Job(models.Model):
 
     def __str__(self):
         return self.title
+
+class Application(models.Model):
+    STATUS_CHOICES = (
+        ('applied', 'Applied'),
+        ('review', 'Under Review'),
+        ('interview', 'Interview'),
+        ('offer', 'Offer'),
+        ('closed', 'Closed'),
+    )
+    
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='applications')
+    applicant = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='applications')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='applied')
+    cover_letter = models.TextField(blank=True, help_text="Optional cover letter")
+    applied_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('job', 'applicant')  # Prevent duplicate applications
+    
+    def __str__(self):
+        return f"{self.applicant.username} -> {self.job.title} ({self.status})"
