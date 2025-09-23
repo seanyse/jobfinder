@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8">
+            <div class="card shadow p-3 mb-4 rounded">
+                <div class="card-body">
+                    <h2>Apply to Job</h2>
+                    <hr />
+                    
+                    <!-- Job Details -->
+                    <div class="mb-4 p-3 bg-light rounded">
+                        <h4>{{ template_data.job.title }}</h4>
+                        <p><strong>Company:</strong> {{ template_data.job.posted_by.username }}</p>
+                        <p><strong>Location:</strong> {{ template_data.job.location|default:"Not specified" }}</p>
+                        <p><strong>Remote/On-site:</strong> {{ template_data.job.remote_or_on_site|capfirst }}</p>
+                        <p><strong>Skills Required:</strong> {{ template_data.job.skills }}</p>
+                        <p><strong>Salary:</strong> 
+                            {% if template_data.job.salary %}
+                                ${{ template_data.job.salary }}
+                            {% else %}
+                                Not listed
+                            {% endif %}
+                        </p>
+                    </div>
+                    
+                    <!-- Application Form -->
+                    <form method="POST">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="cover_letter" class="form-label">Cover Letter (Optional)</label>
+                            <textarea name="cover_letter" id="cover_letter" class="form-control" rows="6" 
+                                      placeholder="Tell the employer why you're interested in this position..."></textarea>
+                        </div>
+                        
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary">Submit Application</button>
+                            <a href="{% url 'jobs.index' %}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

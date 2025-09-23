@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h1>Manage Applications</h1>
+    
+    {% if template_data.applications %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Applicant</th>
+                        <th>Job</th>
+                        <th>Applied Date</th>
+                        <th>Status</th>
+                        <th>Cover Letter</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for application in template_data.applications %}
+                        <tr>
+                            <td>{{ application.applicant.username }}</td>
+                            <td>{{ application.job.title }}</td>
+                            <td>{{ application.applied_at|date:"M d, Y" }}</td>
+                            <td>
+                                <span class="badge 
+                                    {% if application.status == 'applied' %}bg-primary
+                                    {% elif application.status == 'review' %}bg-warning
+                                    {% elif application.status == 'interview' %}bg-info
+                                    {% elif application.status == 'offer' %}bg-success
+                                    {% elif application.status == 'closed' %}bg-secondary
+                                    {% endif %}">
+                                    {{ application.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if application.cover_letter %}
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#coverModal{{ application.id }}">
+                                        View
+                                    </button>
+                                    
+                                    <!-- Cover Letter Modal -->
+                                    <div class="modal fade" id="coverModal{{ application.id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Cover Letter - {{ application.applicant.username }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    {{ application.cover_letter|linebreaks }}
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <em>No cover letter</em>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form method="POST" action="{% url 'jobs.update_application_status' application.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <select name="status" class="form-select form-select-sm d-inline-block w-auto" onchange="this.form.submit()">
+                                        <option value="applied" {% if application.status == 'applied' %}selected{% endif %}>Applied</option>
+                                        <option value="review" {% if application.status == 'review' %}selected{% endif %}>Under Review</option>
+                                        <option value="interview" {% if application.status == 'interview' %}selected{% endif %}>Interview</option>
+                                        <option value="offer" {% if application.status == 'offer' %}selected{% endif %}>Offer</option>
+                                        <option value="closed" {% if application.status == 'closed' %}selected{% endif %}>Closed</option>
+                                    </select>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="text-center mt-5">
+            <h3>No applications yet</h3>
+            <p>No one has applied to your job postings yet.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock content %}

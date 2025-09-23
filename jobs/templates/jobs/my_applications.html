@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h1>My Applications</h1>
+    
+    {% if template_data.applications %}
+        <div class="row">
+            {% for application in template_data.applications %}
+                <div class="col-12 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h5 class="card-title">{{ application.job.title }}</h5>
+                                    <p class="card-text">
+                                        <strong>Company:</strong> {{ application.job.posted_by.username }}<br>
+                                        <strong>Location:</strong> {{ application.job.location|default:"Not specified" }}<br>
+                                        <strong>Applied:</strong> {{ application.applied_at|date:"M d, Y" }}<br>
+                                        <strong>Last Updated:</strong> {{ application.updated_at|date:"M d, Y" }}
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <span class="badge 
+                                        {% if application.status == 'applied' %}bg-primary
+                                        {% elif application.status == 'review' %}bg-warning
+                                        {% elif application.status == 'interview' %}bg-info
+                                        {% elif application.status == 'offer' %}bg-success
+                                        {% elif application.status == 'closed' %}bg-secondary
+                                        {% endif %} fs-6 mb-2">
+                                        {{ application.get_status_display }}
+                                    </span>
+                                    
+                                    <div class="mt-2">
+                                        <a href="{% url 'jobs.track_status' job_id=application.job.id %}" class="btn btn-info btn-sm">Track Status</a>
+                                    </div>
+                                    
+                                    {% if application.cover_letter %}
+                                        <div class="mt-2">
+                                            <button class="btn btn-sm btn-outline-secondary" type="button" 
+                                                    data-bs-toggle="collapse" 
+                                                    data-bs-target="#cover-{{ application.id }}" 
+                                                    aria-expanded="false">
+                                                View Cover Letter
+                                            </button>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            {% if application.cover_letter %}
+                                <div class="collapse mt-3" id="cover-{{ application.id }}">
+                                    <div class="card card-body bg-light">
+                                        <h6>Cover Letter:</h6>
+                                        <p>{{ application.cover_letter|linebreaks }}</p>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center mt-5">
+            <h3>No applications yet</h3>
+            <p>You haven't applied to any jobs yet. <a href="{% url 'jobs.index' %}">Browse jobs</a> to get started!</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock content %}
