@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Candidate Search</h1>
+<form method="get">
+  {{ form.as_p }}
+  <button type="submit">Search</button>
+</form>
+{% if results is not None %}
+  <h2>Results</h2>
+  <ul>
+    {% for p in results %}
+      <li>
+        <a href="{% url 'accounts.profile_detail' username=p.user.username %}">
+          {{ p.user.username }}
+        </a> — {{ p.headline }} • {{ p.location }}
+        {% if p.matched %} ({{ p.matched }} matching skills){% endif %}
+      </li>
+    {% empty %}
+      <li>No matches.</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

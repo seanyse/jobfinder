@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ user_obj.username }} — {{ profile.headline }}</h1>
+<p>{{ profile.bio }}</p>
+<p><strong>Location:</strong> {{ profile.location }}</p>
+<p>
+  {% if profile.website %}<a href="{{ profile.website }}">Website</a>{% endif %}
+  {% if profile.github %} | <a href="{{ profile.github }}">GitHub</a>{% endif %}
+  {% if profile.linkedin %} | <a href="{{ profile.linkedin }}">LinkedIn</a>{% endif %}
+</p>
+<h3>Skills</h3>
+<ul>{% for s in profile.skills.all %}<li>{{ s.name }}</li>{% empty %}<li>—</li>{% endfor %}</ul>
+<h3>Projects</h3>
+<ul>{% for p in profile.projects.all %}<li>{% if p.url %}<a href="{{ p.url }}">{{ p.title }}</a>{% else %}{{ p.title }}{% endif %} — {{ p.description }}</li>{% empty %}<li>—</li>{% endfor %}</ul>
+{% endblock %}

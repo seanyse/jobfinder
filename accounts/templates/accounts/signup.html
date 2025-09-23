@@ -1,22 +1,41 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block content %}
-<div class="p-3 mt-4">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-md-8">
-        <div class="card shadow p-3 mb-4 rounded">
-          <div class="card-body">
-            <h2>Sign Up</h2>
-            <hr />
-            <form method="POST">
-              {% csrf_token %}
-              {{ template_data.form.as_p }}
-              <button type="submit" class="btn bg-dark text-white">Sign Up</button>
-            </form>
+  <div class="p-3 mt-4">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-8">
+          <div class="card shadow p-3 mb-4 rounded">
+            <div class="card-body">
+              <h2>Sign Up</h2>
+              <hr />
+              <form method="post" novalidate>
+                {% csrf_token %}
+                {% for field in template_data.form %}
+                  <div class="mb-3">
+                    <label class="form-label" for="{{ field.id_for_label }}">
+                      {{ field.label }}
+                    </label>
+                    {{ field }}
+                    {% if field.errors %}
+                      <div class="invalid-feedback d-block">
+                        {{ field.errors|striptags }}
+                      </div>
+                    {% endif %}
+                    {% if field.help_text %}
+                      <div class="form-text">
+                        {{ field.help_text|safe }}
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+                <button type="submit" class="btn bg-dark text-white">
+                  Sign Up
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 {% endblock content %}
