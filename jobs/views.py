@@ -3,6 +3,11 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Case, When, IntegerField
 from .models import Job, Application
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+
+def is_seeker(user):
+    return user.is_authenticated and getattr(user, "role", None) == "seeker"
 
 @login_required
 def index(request):
@@ -64,8 +69,7 @@ def index(request):
 def is_recruiter(user):
     return user.is_authenticated and user.role == 'recruiter'
 
-def is_seeker(user):
-    return user.is_authenticated and user.role == 'seeker'
+
 
 @login_required
 @user_passes_test(is_recruiter)
@@ -76,13 +80,17 @@ def create_job(request):
         job.skills = request.POST.get('skills')
         job.salary = request.POST.get('salary') or None
         job.location = request.POST.get('location') or ''
+        lat = request.POST.get('latitude')
+        lon = request.POST.get('longitude')
+        job.latitude = lat or None
+        job.longitude = lon or None
+
         job.remote_or_on_site = request.POST.get('remote_or_on_site')
         job.visa_sponsorship = request.POST.get('visa_sponsorship')
         job.posted_by = request.user
         job.save()
         messages.success(request, 'Job posted successfully!')
         return redirect('jobs.index')
-
 @login_required
 def edit_job(request, job_id):
     job = get_object_or_404(Job, id=job_id)
@@ -194,6 +202,50 @@ def update_application_status(request, application_id):
             messages.error(request, 'Invalid status selected.')
     
     return redirect('jobs.manage_applications')
+
+@user_passes_test(is_seeker)
+def job_map(request):
+    template_data = {'title': 'Jobs Near Me'}
+    jobs = Job.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
+    return render(request, 'jobs/job_map.html', {'template_data': template_data, 'jobs': jobs})
+
+@require_GET
+@user_passes_test(is_seeker)
+def jobs_geo_api(request):
+    jobs = Job.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
+    features = [{
+        "type": "Feature",
+        "geometry": {"type": "Point", "coordinates": [float(j.longitude), float(j.latitude)]},
+        "properties": {
+            "id": j.id,
+            "title": j.title,
+            "company": j.company,
+            "location": j.location,
+            "salary": float(j.salary) if j.salary is not None else None,
+            "detail_url": request.build_absolute_uri(f"/jobs/{j.id}/"),
+        },
+    } for j in jobs]
+    return JsonResponse({"type": "FeatureCollection", "features": features})
+
+
+def create_job(request):
+    if request.method == 'POST':
+        job = Job()
+        job.title = request.POST.get('title')
+        job.skills = request.POST.get('skills')
+        job.salary = request.POST.get('salary') or None
+        job.location = request.POST.get('location') or ''
+        lat = request.POST.get('latitude')
+        lon = request.POST.get('longitude')
+        job.latitude = lat or None
+        job.longitude = lon or None
+        job.remote_or_on_site = request.POST.get('remote_or_on_site')
+        job.visa_sponsorship = request.POST.get('visa_sponsorship')
+        job.posted_by = request.user
+        job.save()
+        messages.success(request, 'Job posted successfully!')
+        return redirect('jobs.index')
+
 
 @login_required
 def job_detail(request, job_id):

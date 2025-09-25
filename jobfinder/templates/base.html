@@ -38,10 +38,11 @@
     <div class="collapse navbar-collapse"
             id="navbarNavAltMarkup">
         <div class="navbar-nav ms-auto navbar-ml">
-
+          {# Always OK to show About once #}
           <a class="nav-link" href="{% url 'home.about' %}">About</a>
 
           {% if user.is_authenticated %}
+
           
           <a class="nav-link" href="{% url 'jobs.index' %}">Jobs</a>
           {% if user.role == 'seeker' %}
@@ -56,9 +57,10 @@
           
           {% else %}
         <a class="nav-link" href="{% url 'jobs.map' %}">Jobs Map</a>
+
             <a class="nav-link" href="{% url 'accounts.login' %}">Login</a>
             <a class="nav-link" href="{% url 'accounts.signup' %}">Sign Up</a>
-            {% endif %}
+          {% endif %}
         </div>
     </div>
     </div>

@@ -6,6 +6,9 @@ class JobAdmin(admin.ModelAdmin):
     list_display = ['title', 'posted_by', 'location', 'remote_or_on_site', 'visa_sponsorship', 'salary', 'created_at']
     list_filter = ['remote_or_on_site', 'visa_sponsorship', 'location', 'created_at']
     search_fields = ['title', 'skills', 'location', 'posted_by__username']
+    list_display = ['title','posted_by','location','city','state','latitude','longitude','remote_or_on_site','visa_sponsorship','salary','created_at']
+    list_filter = ['remote_or_on_site','visa_sponsorship','location','city','state','created_at']
+    search_fields = ['title','skills','location','city','state','posted_by__username']
 
 @admin.register(Application)
 class ApplicationAdmin(admin.ModelAdmin):

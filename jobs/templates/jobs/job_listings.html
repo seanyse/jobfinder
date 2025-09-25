@@ -20,6 +20,8 @@
         <label for="location" class="form-label">Location</label>
         <input type="text" name="location" id="location" placeholder="Location" class="form-control" value="{{ template_data.filters.location }}">
     </div>
+
+    
     <div class="col-md-1">
         <label for="min_salary" class="form-label">Min Salary</label>
         <input type="number" name="min_salary" id="min_salary" placeholder="Min $" class="form-control" value="{{ template_data.filters.min_salary }}">
@@ -76,6 +78,18 @@
 
                         <p><label for="location">Location (optional):</label>
                         <input type="text" name="location" class="form-control" id="location"></p>
+
+                        <div class="row">
+                          <div class="col-md-6">
+                            <label for="latitude">Latitude (optional):</label>
+                            <input type="number" name="latitude" step="0.000001" class="form-control" id="latitude">
+                          </div>
+                          <div class="col-md-6">
+                            <label for="longitude">Longitude (optional):</label>
+                            <input type="number" name="longitude" step="0.000001" class="form-control" id="longitude">
+                          </div>
+                        </div>
+
 
                         <p><label for="remote_or_on_site">Remote / On-site:</label>
                         <select name="remote_or_on_site" class="form-control" id="remote_or_on_site">

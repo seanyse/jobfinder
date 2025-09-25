@@ -1,4 +1,12 @@
 from django.shortcuts import render
+from jobs.models import Job
+from django.http import JsonResponse
+from django.contrib.auth.decorators import user_passes_test
+from math import radians, sin, cos, asin, sqrt
+from decimal import InvalidOperation
+
+def is_seeker(user):
+    return user.is_authenticated and getattr(user, "role", None) == "seeker"
 
 # Create your views here.
 def index(request):
@@ -28,63 +36,48 @@ def _haversine_km(lat1, lon1, lat2, lon2):
     dlon = radians(lon2 - lon1)
     a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
     return 2 * R * asin(sqrt(a))
-
+    
+@user_passes_test(is_seeker)
 def jobs_geojson(request):
-    """
-    Return jobs as JSON. Optional query params:
-      - lat, lng (floats): user's location
-      - radius_km (float): filter radius (default 50km)
-    If lat/lng given, filters; otherwise returns all jobs.
-    """
-    qs = Job.objects.all()
-    lat = request.GET.get("lat")
-    lng = request.GET.get("lng")
-    radius_km = float(request.GET.get("radius_km", 50.0))
+    # /api/jobs/?lat=33.7756&lng=-84.3963&radius_km=50
+    try:
+        lat = float(request.GET.get("lat"))
+        lng = float(request.GET.get("lng"))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "lat/lng required"}, status=400)
 
-    jobs = []
-    if lat and lng:
+    try:
+        radius_km = float(request.GET.get("radius_km", "50"))
+    except (TypeError, ValueError):
+        radius_km = 50.0
+
+    qs = Job.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
+
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371.0
+        dlat = radians(lat2 - lat1)
+        dlon = radians(lon2 - lon1)
+        a = sin(dlat/2)**2 + cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
+        return 2 * R * asin(sqrt(a))
+
+    features = []
+    for j in qs:
         try:
-            user_lat = float(lat)
-            user_lng = float(lng)
-            for j in qs:
-                d = _haversine_km(user_lat, user_lng, j.latitude, j.longitude)
-                if d <= radius_km:
-                    jobs.append({
-                        "id": j.id,
-                        "title": j.title,
-                        "company": j.company,
-                        "description": j.description,
-                        "lat": j.latitude,
-                        "lng": j.longitude,
-                        "city": j.city,
-                        "state": j.state,
-                        "distance_km": round(d, 2),
-                    })
-        except ValueError:
-            # Fallback: if bad lat/lng, just return all
-            for j in qs:
-                jobs.append({
+            jlat = float(j.latitude); jlng = float(j.longitude)
+        except (TypeError, ValueError, InvalidOperation):
+            continue
+        if haversine(lat, lng, jlat, jlng) <= radius_km:
+            features.append({
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [jlng, jlat]},
+                "properties": {
                     "id": j.id,
                     "title": j.title,
                     "company": j.company,
-                    "description": j.description,
-                    "lat": j.latitude,
-                    "lng": j.longitude,
-                    "city": j.city,
-                    "state": j.state,
-                })
-    else:
-        for j in qs:
-            jobs.append({
-                "id": j.id,
-                "title": j.title,
-                "company": j.company,
-                "description": j.description,
-                "lat": j.latitude,
-                "lng": j.longitude,
-                "city": j.city,
-                "state": j.state,
+                    "location": j.location,
+                    "detail_url": request.build_absolute_uri(f"/jobs/{j.id}/"),
+                },
             })
 
-    return JsonResponse({"jobs": jobs})
+    return JsonResponse({"type": "FeatureCollection", "features": features})
 

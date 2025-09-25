@@ -6,10 +6,17 @@ class Job(models.Model):
     id = models.AutoField(primary_key=True)
     title = models.CharField(max_length=200)
     skills = models.TextField(help_text="List required skills, separated by commas")
+    company = models.CharField(max_length=200, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    skills = models.TextField(help_text="List required skills, separated by commas")
     salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Annual salary in USD")
     posted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     location = models.CharField(max_length=200, null=True, blank=True)
-    
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    city = models.CharField(max_length=120, blank=True, default="")
+    state = models.CharField(max_length=120, blank=True, default="")
+
     REMOTE_CHOICES = (
         ('remote', 'Remote'),
         ('on_site', 'On-site'),
