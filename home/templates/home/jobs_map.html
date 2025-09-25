@@ -1,123 +1,74 @@
-{% extends 'base.html' %}
-{% load static %}
-{% block content %}
-
-<link rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-      crossorigin="" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-        crossorigin=""></script>
-
-<div class="container my-4">
-  <h1 class="mb-3">Jobs Near Me</h1>
-
-  <div class="row g-3">
-    <div class="col-12 col-lg-9">
-      <div id="map" style="height: 520px; border-radius: 12px;"></div>
-    </div>
-    <div class="col-12 col-lg-3">
-      <div class="card">
-        <div class="card-body">
-          <h5>Filters</h5>
-          <label class="form-label" for="radius">Radius (km)</label>
-          <input id="radius" type="number" class="form-control" value="50" min="1" step="1" />
-          <button id="reload" class="btn btn-primary mt-2 w-100">Search Near Me</button>
-          <hr/>
-          <div id="results" style="max-height: 350px; overflow:auto;"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script>
-let map, userMarker, jobsLayer;
+document.addEventListener('DOMContentLoaded', function () {
+  const map = L.map('map').setView([33.7756, -84.3963], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-function initMap(lat=33.7756, lng=-84.3963, zoom=12) { // default: Georgia Tech-ish
-  map = L.map('map').setView([lat, lng], zoom);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 20,
-    attribution: '&copy; OpenStreetMap'
-  }).addTo(map);
-  userMarker = L.marker([lat, lng], {title: 'You'}).addTo(map)
-               .bindPopup('You are here').openPopup();
-  jobsLayer = L.layerGroup().addTo(map);
-}
+  const list = document.getElementById('jobList');
+  const radiusInput = document.getElementById('radius');
+  const reloadBtn = document.getElementById('reload');
 
-async function loadJobs(lat, lng, radiusKm) {
-  jobsLayer.clearLayers();
-  document.getElementById('results').innerHTML = 'Loading...';
+  let jobMarkers = [];
+  function setLoading(on) { list.innerHTML = on ? '<li class="list-group-item">Loading...</li>' : ''; }
+  function clearMarkers() { jobMarkers.forEach(m => map.removeLayer(m)); jobMarkers = []; }
+  function getRadius() { return parseInt(radiusInput.value, 10) || 25; }
 
-  const params = new URLSearchParams({ lat, lng, radius_km: radiusKm });
-  const resp = await fetch(`/api/jobs/?${params.toString()}`);
-  const data = await resp.json();
-
-  const list = [];
-  data.jobs.forEach(j => {
-    const marker = L.marker([j.lat, j.lng]).addTo(jobsLayer);
-    const dist = (j.distance_km !== undefined) ? `<div><b>Distance:</b> ${j.distance_km} km</div>` : '';
-    marker.bindPopup(`
-      <div style="min-width:220px">
-        <div><b>${j.title}</b></div>
-        <div>${j.company ?? ''}</div>
-        <div>${j.city ?? ''} ${j.state ?? ''}</div>
-        ${dist}
-        <hr style="margin:6px 0"/>
-        <div style="font-size: 0.9rem;">${(j.description || '').slice(0,140)}${(j.description||'').length>140?'…':''}</div>
-      </div>
-    `);
-    list.push(`
-      <div class="mb-2">
-        <div><b>${j.title}</b> ${j.company ? '· ' + j.company : ''}</div>
-        <div style="font-size:0.9rem">${j.city ?? ''} ${j.state ?? ''} ${j.distance_km !== undefined ? `· ${j.distance_km} km` : ''}</div>
-      </div>
-      <hr/>
-    `);
-  });
-
-  document.getElementById('results').innerHTML = list.length ? list.join('') : 'No jobs found in this radius.';
-}
-
-function getRadius() {
-  return parseFloat(document.getElementById('radius').value) || 50;
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  initMap();
-
-  // Try to use the user's geolocation
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const { latitude, longitude } = pos.coords;
-      map.setView([latitude, longitude], 13);
-      userMarker.setLatLng([latitude, longitude]);
-      await loadJobs(latitude, longitude, getRadius());
-    }, async () => {
-      // permission denied → load all jobs without filtering
-      await loadJobs(33.7756, -84.3963, getRadius());
-    });
-  } else {
-    loadJobs(33.7756, -84.3963, getRadius());
+  async function loadJobs(lat, lng, radiusKm) {
+    setLoading(true);
+    try {
+      const url = `/api/jobs/?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}&radius_km=${encodeURIComponent(radiusKm)}`;
+      console.log('Fetching jobs:', url);
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      renderJobs(data.jobs || []);
+    } catch (err) {
+      console.error('Failed to load jobs:', err);
+      list.innerHTML = `<li class="list-group-item text-danger">Error loading jobs: ${String(err)}</li>`;
+    } finally {
+      // ensure we don’t stay on "Loading..."
+      if (!list.innerHTML.includes('Error') && list.innerHTML.includes('Loading')) list.innerHTML = '';
+    }
   }
 
-  document.getElementById('reload').addEventListener('click', async () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        userMarker.setLatLng([latitude, longitude]);
-        map.setView([latitude, longitude], 13);
-        await loadJobs(latitude, longitude, getRadius());
-      }, async () => {
-        await loadJobs(33.7756, -84.3963, getRadius());
-      });
-    } else {
-      await loadJobs(33.7756, -84.3963, getRadius());
+  function renderJobs(jobs) {
+    clearMarkers();
+    list.innerHTML = '';
+    if (!jobs.length) {
+      list.innerHTML = '<li class="list-group-item">No jobs found.</li>';
+      return;
     }
+    jobs.forEach(j => {
+      if (j.lat == null || j.lng == null) return;
+      const m = L.marker([j.lat, j.lng]).addTo(map);
+      m.bindPopup(`<strong>${j.title ?? ''}</strong><br>${j.company ?? ''}<br>${[j.city, j.state].filter(Boolean).join(', ')}`);
+      jobMarkers.push(m);
+
+      const li = document.createElement('li');
+      li.className = 'list-group-item';
+      li.innerHTML = `<div class="fw-semibold">${j.title ?? ''}</div>
+                      <div>${j.company ?? ''}</div>
+                      <div class="text-muted">${[j.city, j.state].filter(Boolean).join(', ')}</div>`;
+      li.onclick = () => { map.setView([j.lat, j.lng], 14); m.openPopup(); };
+      list.appendChild(li);
+    });
+  }
+
+  function initFromGeolocation() {
+    setLoading(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => loadJobs(pos.coords.latitude, pos.coords.longitude, getRadius()),
+        ()  => loadJobs(33.7756, -84.3963, getRadius())
+      );
+    } else {
+      loadJobs(33.7756, -84.3963, getRadius());
+    }
+  }
+
+  radiusInput.addEventListener('input', e => {
+    const label = document.getElementById('radiusLabel'); if (label) label.textContent = e.target.value;
   });
+  reloadBtn.addEventListener('click', initFromGeolocation);
+  initFromGeolocation();
 });
 </script>
-
-{% endblock content %}
-
