@@ -5,6 +5,9 @@ from django.contrib.auth.decorators import user_passes_test
 from math import radians, sin, cos, asin, sqrt
 from decimal import InvalidOperation
 
+def is_seeker(user):
+    return user.is_authenticated and getattr(user, "role", None) == "seeker"
+
 # Create your views here.
 def index(request):
     template_data = {}
