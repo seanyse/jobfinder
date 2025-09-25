@@ -3,6 +3,11 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Case, When, IntegerField
 from .models import Job, Application
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+
+def is_seeker(user):
+    return user.is_authenticated and getattr(user, "role", None) == "seeker"
 
 @login_required
 def index(request):
