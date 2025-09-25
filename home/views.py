@@ -2,6 +2,8 @@ from django.shortcuts import render
 from jobs.models import Job
 from django.http import JsonResponse
 from django.contrib.auth.decorators import user_passes_test
+from math import radians, sin, cos, asin, sqrt
+from decimal import InvalidOperation
 
 # Create your views here.
 def index(request):
