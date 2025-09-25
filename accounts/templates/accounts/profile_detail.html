@@ -1,15 +1,102 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ user_obj.username }} — {{ profile.headline }}</h1>
-<p>{{ profile.bio }}</p>
-<p><strong>Location:</strong> {{ profile.location }}</p>
-<p>
-  {% if profile.website %}<a href="{{ profile.website }}">Website</a>{% endif %}
-  {% if profile.github %} | <a href="{{ profile.github }}">GitHub</a>{% endif %}
-  {% if profile.linkedin %} | <a href="{{ profile.linkedin }}">LinkedIn</a>{% endif %}
-</p>
-<h3>Skills</h3>
-<ul>{% for s in profile.skills.all %}<li>{{ s.name }}</li>{% empty %}<li>—</li>{% endfor %}</ul>
-<h3>Projects</h3>
-<ul>{% for p in profile.projects.all %}<li>{% if p.url %}<a href="{{ p.url }}">{{ p.title }}</a>{% else %}{{ p.title }}{% endif %} — {{ p.description }}</li>{% empty %}<li>—</li>{% endfor %}</ul>
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">{{ user_obj.username }}'s Profile</h2>
+    {% if user.is_authenticated and user.username == user_obj.username %}
+      <a href="{% url 'accounts.profile_edit' %}" class="btn btn-primary">
+        <i class="fas fa-edit me-1"></i>Edit Profile
+      </a>
+    {% endif %}
+  </div>
+  
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body text-center">
+          {% if profile.profile_picture %}
+            <img src="{{ profile.profile_picture.url }}" class="img-fluid rounded-circle mb-3" style="width: 120px; height: 120px; object-fit: cover;" alt="Profile picture" />
+          {% else %}
+            <div class="bg-light rounded-circle d-flex align-items-center justify-content-center mb-3 mx-auto" style="width: 120px; height: 120px;">
+              <i class="fas fa-user fa-3x text-muted"></i>
+            </div>
+          {% endif %}
+          <h5 class="card-title">{{ user_obj.username }}</h5>
+          <p class="text-muted mb-0">{{ profile.location }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="card h-100">
+        <div class="card-body">
+          <h3 class="mb-2">{{ profile.headline }}</h3>
+          <p>{{ profile.bio }}</p>
+          <p>
+            {% if profile.website %}<a href="{{ profile.website }}" target="_blank">Website</a>{% endif %}
+            {% if profile.github %} | <a href="{{ profile.github }}" target="_blank">GitHub</a>{% endif %}
+            {% if profile.linkedin %} | <a href="{{ profile.linkedin }}" target="_blank">LinkedIn</a>{% endif %}
+          </p>
+          <h5>Skills</h5>
+          <ul>{% for s in profile.skills.all %}<li>{{ s.name }}</li>{% empty %}<li>—</li>{% endfor %}</ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mt-1">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">Education</div>
+        <div class="card-body">
+          {% for e in profile.education.all %}
+            <div class="border rounded p-3 mb-3">
+              <h6 class="mb-1">{{ e.degree }} in {{ e.major }}</h6>
+              <p class="mb-1 text-muted">{{ e.school }}</p>
+              <p class="mb-0 text-muted">{{ e.graduation_month }}/{{ e.graduation_year }}</p>
+            </div>
+          {% empty %}
+            <p class="text-muted mb-0">No education listed.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">Work Experience</div>
+        <div class="card-body">
+          {% for w in profile.work_experience.all %}
+            <div class="border rounded p-3 mb-3">
+              <h6 class="mb-1">{{ w.company }}</h6>
+              <p class="mb-0">{{ w.description }}</p>
+            </div>
+          {% empty %}
+            <p class="text-muted mb-0">No work experience listed.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mt-1">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">Projects</div>
+        <div class="card-body">
+          <div class="row">
+            {% for p in profile.projects.all %}
+              <div class="col-md-6 mb-3">
+                <div class="border rounded p-3 h-100">
+                  <h6 class="mb-1">{% if p.url %}<a href="{{ p.url }}" target="_blank">{{ p.title }}</a>{% else %}{{ p.title }}{% endif %}</h6>
+                  <p class="mb-0">{{ p.description }}</p>
+                </div>
+              </div>
+            {% empty %}
+              <p class="text-muted mb-0">No projects yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
