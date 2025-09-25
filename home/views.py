@@ -20,6 +20,7 @@ def about(request):
     template_data['title'] = 'About'
     return render(request, 'home/about.html', {'template_data': template_data})
 
+@user_passes_test(is_seeker)
 def jobs_map(request):
     """
     Page with the interactive map. The browser will ask for the user's location,
@@ -37,9 +38,15 @@ def _haversine_km(lat1, lon1, lat2, lon2):
     a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
     return 2 * R * asin(sqrt(a))
     
-@user_passes_test(is_seeker)
 def jobs_geojson(request):
     # /api/jobs/?lat=33.7756&lng=-84.3963&radius_km=50
+    # Check if user is authenticated and is a seeker
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Authentication required"}, status=401)
+    
+    if not is_seeker(request.user):
+        return JsonResponse({"error": "Access denied. Job seekers only."}, status=403)
+    
     try:
         lat = float(request.GET.get("lat"))
         lng = float(request.GET.get("lng"))
