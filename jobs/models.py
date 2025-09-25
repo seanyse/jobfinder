@@ -12,10 +12,8 @@ class Job(models.Model):
     salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Annual salary in USD")
     posted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     location = models.CharField(max_length=200, null=True, blank=True)
-
-
-    latitude = models.FloatField(null=True, blank=True)
-    longitude = models.FloatField(null=True, blank=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     city = models.CharField(max_length=120, blank=True, default="")
     state = models.CharField(max_length=120, blank=True, default="")
 
