@@ -69,8 +69,7 @@ def index(request):
 def is_recruiter(user):
     return user.is_authenticated and user.role == 'recruiter'
 
-def is_seeker(user):
-    return user.is_authenticated and user.role == 'seeker'
+
 
 @login_required
 @user_passes_test(is_recruiter)
@@ -81,13 +80,17 @@ def create_job(request):
         job.skills = request.POST.get('skills')
         job.salary = request.POST.get('salary') or None
         job.location = request.POST.get('location') or ''
+        lat = request.POST.get('latitude')
+        lon = request.POST.get('longitude')
+        job.latitude = lat or None
+        job.longitude = lon or None
+
         job.remote_or_on_site = request.POST.get('remote_or_on_site')
         job.visa_sponsorship = request.POST.get('visa_sponsorship')
         job.posted_by = request.user
         job.save()
         messages.success(request, 'Job posted successfully!')
         return redirect('jobs.index')
-
 @login_required
 def edit_job(request, job_id):
     job = get_object_or_404(Job, id=job_id)
