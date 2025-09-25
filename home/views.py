@@ -1,4 +1,7 @@
 from django.shortcuts import render
+from jobs.models import Job
+from django.http import JsonResponse
+from django.contrib.auth.decorators import user_passes_test
 
 # Create your views here.
 def index(request):
