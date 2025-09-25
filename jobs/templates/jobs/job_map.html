@@ -12,37 +12,100 @@
       crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
-(function() {
-  const map = L.map('map');
-  const featuresUrl = "{% url 'jobs.geo' %}";  // <- THIS must be used
-
-  console.log('Fetching:', featuresUrl);      // debug
-
-  map.setView([39.5, -98.35], 4);
+(function () {
+  const map = L.map('map').setView([33.7490, -84.3880], 12); // ATL default
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-  fetch(featuresUrl, { credentials: 'same-origin' })
-    .then(r => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    })
-    .then(geo => {
-      console.log('GEO', geo);
-      const points = [];
-      (geo.features || []).forEach(f => {
-        const [lng, lat] = f.geometry.coordinates;
-        const p = f.properties || {};
-        const m = L.marker([lat, lng]).addTo(map)
-          .bindPopup(`<b>${p.title || ''}</b><br>${p.company || ''}<br>${p.location || ''}<br><a href="${p.detail_url || '#'}">View</a>`);
-        points.push(m.getLatLng());
+  // --- UI: radius field + button (if you already have these in the template, reuse their ids) ---
+  const radiusInput = document.querySelector('#radius_km') || (function () {
+    // fallback: create a simple radius box if one doesn't exist
+    const box = document.createElement('div');
+    box.style.cssText = 'position:absolute;top:12px;right:12px;background:white;padding:8px;border-radius:8px;z-index:1000;';
+    box.innerHTML = `
+      <label style="font-size:12px">Radius (km)</label>
+      <input id="radius_km" type="number" value="50" style="width:80px;margin-left:6px">
+      <button id="search_btn" class="btn btn-sm btn-primary" style="margin-left:6px">Search</button>
+    `;
+    document.body.appendChild(box);
+    return box.querySelector('#radius_km');
+  })();
+  const searchBtn = document.querySelector('#search_btn');
+
+  // Layer group to manage job markers
+  const jobsLayer = L.layerGroup().addTo(map);
+
+  // Helper: fetch jobs near a lat/lng within radius
+  function loadJobs(lat, lng, radiusKm) {
+    const url = `/api/jobs/?lat=${lat}&lng=${lng}&radius_km=${radiusKm}`;
+    console.log('Fetching jobs:', url);
+
+    // Clear old markers
+    jobsLayer.clearLayers();
+
+    fetch(url, { credentials: 'same-origin' })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(geo => {
+        const pts = [];
+        (geo.features || []).forEach(f => {
+          const [lngJ, latJ] = f.geometry.coordinates; // GeoJSON = [lng, lat]
+          const p = f.properties || {};
+          const m = L.marker([latJ, lngJ])
+            .bindPopup(`<b>${p.title || ''}</b><br>${p.company || ''}<br>${p.location || ''}<br><a href="${p.detail_url || '#'}">View</a>`);
+          jobsLayer.addLayer(m);
+          pts.push([latJ, lngJ]);
+        });
+        if (pts.length) {
+          map.fitBounds(L.latLngBounds(pts), { padding: [20, 20] });
+        } else {
+          console.warn('No jobs returned for this query.');
+        }
+      })
+      .catch(err => {
+        console.error('Error loading jobs:', err);
+        alert('Error loading jobs (see console).');
       });
-      if (points.length) {
-        map.fitBounds(L.latLngBounds(points), { padding: [20, 20] });
-      } else {
-        console.warn('No features returned from jobs.geo');
-      }
-    })
-    .catch(err => console.error('Map load error:', err));
+  }
+
+  // Drop a "you are here" marker at the map center (or geolocate)
+  function markHere(lat, lng) {
+    L.marker([lat, lng]).addTo(map).bindPopup('You are here').openPopup();
+  }
+
+  // Try browser geolocation first; fall back to ATL center
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const lat = pos.coords.latitude, lng = pos.coords.longitude;
+        map.setView([lat, lng], 13);
+        markHere(lat, lng);
+        loadJobs(lat, lng, Number(radiusInput.value || 50));
+      },
+      () => {
+        const [lat, lng] = [33.7490, -84.3880];
+        map.setView([lat, lng], 12);
+        markHere(lat, lng);
+        loadJobs(lat, lng, Number(radiusInput.value || 50));
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  } else {
+    const [lat, lng] = [33.7490, -84.3880];
+    map.setView([lat, lng], 12);
+    markHere(lat, lng);
+    loadJobs(lat, lng, Number(radiusInput.value || 50));
+  }
+
+  // Hook up the Search button (uses current map center)
+  if (searchBtn) {
+    searchBtn.addEventListener('click', () => {
+      const c = map.getCenter();
+      loadJobs(c.lat, c.lng, Number(radiusInput.value || 50));
+    });
+  }
 })();
 </script>
+
 {% endblock %}
