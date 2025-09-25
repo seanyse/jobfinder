@@ -44,39 +44,29 @@ def jobs_geojson(request):
         lat = float(request.GET.get("lat"))
         lng = float(request.GET.get("lng"))
     except (TypeError, ValueError):
-        return JsonResponse({"error": "lat/lng required and must be numbers"}, status=400)
+        return JsonResponse({"error": "lat/lng required"}, status=400)
 
     try:
         radius_km = float(request.GET.get("radius_km", "50"))
     except (TypeError, ValueError):
         radius_km = 50.0
 
-    # Only jobs with coordinates
     qs = Job.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
 
     def haversine(lat1, lon1, lat2, lon2):
         R = 6371.0
         dlat = radians(lat2 - lat1)
         dlon = radians(lon2 - lon1)
-        a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+        a = sin(dlat/2)**2 + cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
         return 2 * R * asin(sqrt(a))
 
     features = []
     for j in qs:
         try:
-            jlat = float(j.latitude)
-            jlng = float(j.longitude)
+            jlat = float(j.latitude); jlng = float(j.longitude)
         except (TypeError, ValueError, InvalidOperation):
             continue
-
-        dist = haversine(lat, lng, jlat, jlng)
-        if dist <= radius_km:
-            # Convert Decimal fields safely
-            try:
-                salary_val = float(j.salary) if j.salary is not None else None
-            except (TypeError, ValueError, InvalidOperation):
-                salary_val = None
-
+        if haversine(lat, lng, jlat, jlng) <= radius_km:
             features.append({
                 "type": "Feature",
                 "geometry": {"type": "Point", "coordinates": [jlng, jlat]},
@@ -85,8 +75,6 @@ def jobs_geojson(request):
                     "title": j.title,
                     "company": j.company,
                     "location": j.location,
-                    "distance_km": round(dist, 2),
-                    "salary": salary_val,
                     "detail_url": request.build_absolute_uri(f"/jobs/{j.id}/"),
                 },
             })
