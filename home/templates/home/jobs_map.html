@@ -59,9 +59,29 @@ async function loadJobs(lat, lng, radiusKm) {
     const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    console.log('Jobs payload:', data);
+console.log('Jobs payload:', data);
 
-    renderJobs(Array.isArray(data.jobs) ? data.jobs : []);
+let jobs = [];
+if (Array.isArray(data?.features)) {
+  // Convert GeoJSON FeatureCollection -> [{lat, lng, ...}]
+  jobs = data.features.map(f => {
+    const coords = f?.geometry?.coordinates || [];
+    const props  = f?.properties || {};
+    return {
+      lat: Number(coords[1]),
+      lng: Number(coords[0]),
+      title: props.title,
+      company: props.company,
+      location: props.location,
+      detail_url: props.detail_url,
+      distance_km: props.distance_km,
+    };
+  });
+} else if (Array.isArray(data?.jobs)) {
+  // Back-compat if you ever send plain list {jobs:[...]}
+  jobs = data.jobs;
+}
+renderJobs(jobs);
   } catch (err) {
     console.error('Error loading jobs:', err);
     document.getElementById('results').innerHTML =
