@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div class="container my-4">
+  <h1 class="mb-3">Jobs Near Me</h1>
+  <div id="map" style="height: 520px; border-radius: 12px;"></div>
+  <p class="text-muted mt-2">Showing {{ jobs|length }} job(s) with coordinates.</p>
+</div>
+
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(function() {
+  const map = L.map('map');
+  const featuresUrl = "{% url 'jobs.geo' %}";
+  map.setView([39.5, -98.35], 4); // Default US center
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  fetch(featuresUrl, {credentials: 'same-origin'})
+    .then(r => r.json())
+    .then(geo => {
+      const markers = [];
+      geo.features.forEach(f => {
+        const [lng, lat] = f.geometry.coordinates;
+        const p = f.properties;
+        const m = L.marker([lat, lng]).addTo(map)
+          .bindPopup(`<b>${p.title}</b><br>${p.company || ''}<br>${p.location || ''}<br><a href="${p.detail_url}">View</a>`);
+        markers.push(m.getLatLng());
+      });
+      if (markers.length) {
+        const group = L.latLngBounds(markers);
+        map.fitBounds(group, {padding: [20,20]});
+      }
+    }).catch(err => console.error(err));
+})();
+</script>
+{% endblock %}
