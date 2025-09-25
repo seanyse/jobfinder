@@ -14,29 +14,35 @@
 <script>
 (function() {
   const map = L.map('map');
-  const featuresUrl = "{% url 'jobs.geo' %}";
-  map.setView([39.5, -98.35], 4); // Default US center
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
+  const featuresUrl = "{% url 'jobs.geo' %}";  // <- THIS must be used
 
-  fetch(featuresUrl, {credentials: 'same-origin'})
-    .then(r => r.json())
+  console.log('Fetching:', featuresUrl);      // debug
+
+  map.setView([39.5, -98.35], 4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+  fetch(featuresUrl, { credentials: 'same-origin' })
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
     .then(geo => {
-      const markers = [];
-      geo.features.forEach(f => {
+      console.log('GEO', geo);
+      const points = [];
+      (geo.features || []).forEach(f => {
         const [lng, lat] = f.geometry.coordinates;
-        const p = f.properties;
+        const p = f.properties || {};
         const m = L.marker([lat, lng]).addTo(map)
-          .bindPopup(`<b>${p.title}</b><br>${p.company || ''}<br>${p.location || ''}<br><a href="${p.detail_url}">View</a>`);
-        markers.push(m.getLatLng());
+          .bindPopup(`<b>${p.title || ''}</b><br>${p.company || ''}<br>${p.location || ''}<br><a href="${p.detail_url || '#'}">View</a>`);
+        points.push(m.getLatLng());
       });
-      if (markers.length) {
-        const group = L.latLngBounds(markers);
-        map.fitBounds(group, {padding: [20,20]});
+      if (points.length) {
+        map.fitBounds(L.latLngBounds(points), { padding: [20, 20] });
+      } else {
+        console.warn('No features returned from jobs.geo');
       }
-    }).catch(err => console.error(err));
+    })
+    .catch(err => console.error('Map load error:', err));
 })();
 </script>
 {% endblock %}
