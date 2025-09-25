@@ -14,10 +14,10 @@
 <script>
 (function () {
   console.log("[map] init");
-  const map = L.map('map').setView([33.7490, -84.3880], 12); // ATL default
+
+  const map = L.map('map').setView([33.7490, -84.3880], 12); // ATL fallback
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-  // Layer groups
   const jobsLayer = L.layerGroup().addTo(map);
   let hereMarker = null;
 
@@ -26,66 +26,57 @@
     hereMarker = L.marker([lat, lng]).addTo(map).bindPopup('You are here');
   }
 
-  // Add markers from GeoJSON-ish object
-  function renderJobs(data) {
-    console.log("[map] renderJobs raw:", data);
-    const feats = Array.isArray(data?.features) ? data.features
-                : Array.isArray(data?.jobs) ? data.jobs     // tolerate alternate shape
-                : [];
+  function renderJobs(geo) {
+    console.log("[map] rendering…");
     jobsLayer.clearLayers();
+    const feats = Array.isArray(geo?.features) ? geo.features : [];
     const pts = [];
 
     feats.forEach(f => {
-      // Accept either Feature or plain object with lat/lng
-      let lat, lng, props = {};
-      if (f?.geometry?.coordinates) {
-        const [lngRaw, latRaw] = f.geometry.coordinates;
-        lat = Number(latRaw);
-        lng = Number(lngRaw);
-        props = f.properties || {};
-      } else if (f?.lat && f?.lng) {
-        lat = Number(f.lat);
-        lng = Number(f.lng);
-        props = f;
-      }
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        const m = L.marker([lat, lng]).bindPopup(
-          `<b>${props.title || ''}</b><br>${props.company || ''}<br>${props.location || ''}` +
-          (props.detail_url ? `<br><a href="${props.detail_url}">View</a>` : '')
+      if (!f?.geometry?.coordinates) return;
+      const [lng, lat] = f.geometry.coordinates; // GeoJSON is [lng, lat]
+      const p = f.properties || {};
+      const m = L.marker([Number(lat), Number(lng)])
+        .bindPopup(
+          `<b>${p.title || ''}</b><br>` +
+          `${p.company || ''}<br>` +
+          `${p.location || ''}` +
+          (p.detail_url ? `<br><a href="${p.detail_url}">View</a>` : '')
         );
-        jobsLayer.addLayer(m);
-        pts.push([lat, lng]);
-      }
+      jobsLayer.addLayer(m);
+      pts.push([Number(lat), Number(lng)]);
     });
 
     console.log("[map] markers placed:", pts.length);
-    if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [20, 20] });
-    if (!pts.length) console.warn("[map] No job features to render");
+    if (pts.length) {
+      map.fitBounds(L.latLngBounds(pts), { padding: [20, 20] });
+    } else {
+      console.warn("[map] No job features to render");
+    }
   }
 
-  // Fetch helper with loud logging
   function fetchJSON(url) {
-    console.log("[map] fetching:", url);
+    console.log("[map] Fetching:", url);
     return fetch(url, { credentials: 'same-origin' })
       .then(r => {
-        console.log("[map] response", r.status, r.url);
-        if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
+        console.log("[map] Response:", r.status);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       });
   }
 
-  // Use your nearby endpoint
   function loadNearby(lat, lng, radiusKm) {
     const url = `/api/jobs/?lat=${lat}&lng=${lng}&radius_km=${radiusKm}`;
-    return fetchJSON(url).then(renderJobs).catch(err => {
+    return fetchJSON(url).then(data => {
+      console.log("[map] Jobs payload:", data);
+      renderJobs(data);
+    }).catch(err => {
       console.error("[map] nearby error:", err);
       alert("Couldn't load nearby jobs — see console.");
     });
   }
 
-  // Start: geolocate or fallback; then load jobs
-  const defaultCenter = [33.7490, -84.3880];
-  const defaultRadius = 50;
+  const fallback = [33.7490, -84.3880], radiusKm = 50;
 
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
@@ -93,24 +84,23 @@
         const lat = pos.coords.latitude, lng = pos.coords.longitude;
         map.setView([lat, lng], 13);
         markHere(lat, lng);
-        loadNearby(lat, lng, defaultRadius);
+        loadNearby(lat, lng, radiusKm);
       },
       () => {
-        const [lat, lng] = defaultCenter;
-        map.setView([lat, lng], 12);
-        markHere(lat, lng);
-        loadNearby(lat, lng, defaultRadius);
+        map.setView(fallback, 12);
+        markHere(fallback[0], fallback[1]);
+        loadNearby(fallback[0], fallback[1], radiusKm);
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
   } else {
-    const [lat, lng] = defaultCenter;
-    map.setView([lat, lng], 12);
-    markHere(lat, lng);
-    loadNearby(lat, lng, defaultRadius);
+    map.setView(fallback, 12);
+    markHere(fallback[0], fallback[1]);
+    loadNearby(fallback[0], fallback[1], radiusKm);
   }
 })();
 </script>
+
 
 
 
