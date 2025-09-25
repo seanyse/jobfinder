@@ -1,23 +1,245 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>My Profile</h1>
-<form method="post">
-  {% csrf_token %}
-  {{ form.non_field_errors }}
-  <p>{{ form.headline.label_tag }} {{ form.headline }}</p>
-  <p>{{ form.bio.label_tag }} {{ form.bio }}</p>
-  <p>{{ form.location.label_tag }} {{ form.location }}</p>
-  <p>{{ form.website.label_tag }} {{ form.website }}</p>
-  <p>{{ form.github.label_tag }} {{ form.github }}</p>
-  <p>{{ form.linkedin.label_tag }} {{ form.linkedin }}</p>
-  <fieldset>
-    <legend>Skills</legend>
-    {{ form.skills }}
-  </fieldset>
-  <fieldset>
-    <legend>Projects</legend>
-    {{ form.projects }}
-  </fieldset>
-  <button type="submit">Save</button>
-</form>
+<div class="container py-4">
+  <h2 class="mb-3">My Profile</h2>
+  <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="card h-100">
+          <div class="card-header">Profile Picture</div>
+          <div class="card-body text-center">
+            {% if form.instance.profile_picture %}
+              <img src="{{ form.instance.profile_picture.url }}" class="img-fluid rounded mb-3" style="max-height:180px;" alt="Profile picture" />
+            {% endif %}
+            {{ form.profile_picture }}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-8">
+        <div class="card h-100">
+          <div class="card-header">Basics</div>
+          <div class="card-body">
+            <div class="mb-3">{{ form.headline.label_tag }} {{ form.headline }}</div>
+            <div class="mb-3">{{ form.bio.label_tag }} {{ form.bio }}</div>
+            <div class="row">
+              <div class="col-md-6 mb-3">{{ form.location.label_tag }} {{ form.location }}</div>
+              <div class="col-md-6 mb-3">{{ form.website.label_tag }} {{ form.website }}</div>
+            </div>
+            <div class="row">
+              <div class="col-md-6 mb-3">{{ form.github.label_tag }} {{ form.github }}</div>
+              <div class="col-md-6 mb-3">{{ form.linkedin.label_tag }} {{ form.linkedin }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mt-1">
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header">Skills</div>
+          <div class="card-body">
+            <div class="mb-3">{{ form.skills }}</div>
+            <div class="mb-2">{{ form.new_skills.label_tag }} {{ form.new_skills }}</div>
+            <small class="text-muted">Separate multiple skills with commas.</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Projects</span>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="add-project">Add Project</button>
+          </div>
+          <div class="card-body">
+            <div id="projects-formset">
+              {{ project_formset.management_form }}
+              {% for f in project_formset %}
+                <div class="border rounded p-3 mb-3 project-item">
+                  <div class="mb-2"><label for="{{ f.title.id_for_label }}">Title:</label> {{ f.title }}</div>
+                  <div class="mb-2"><label for="{{ f.url.id_for_label }}">Url:</label> {{ f.url }}</div>
+                  <div class="mb-2"><label for="{{ f.description.id_for_label }}">Description:</label> {{ f.description }}</div>
+                  {% if f.id.value %}<input type="hidden" name="{{ f.id.html_name }}" value="{{ f.id.value }}">{% endif %}
+                  {% if project_formset.can_delete %}
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-project">Remove Project</button>
+                    <span style="display:none;">{{ f.DELETE }}</span>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mt-1">
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Education</span>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="add-education">Add Education</button>
+          </div>
+          <div class="card-body">
+            <div id="education-formset">
+              {{ education_formset.management_form }}
+              {% for f in education_formset %}
+                <div class="border rounded p-3 mb-3 education-item">
+                  <div class="mb-2"><label for="{{ f.school.id_for_label }}">School:</label> {{ f.school }}</div>
+                  <div class="row">
+                    <div class="col-md-6 mb-2"><label for="{{ f.graduation_month.id_for_label }}">Graduation Month:</label> {{ f.graduation_month }}</div>
+                    <div class="col-md-6 mb-2"><label for="{{ f.graduation_year.id_for_label }}">Graduation Year:</label> {{ f.graduation_year }}</div>
+                  </div>
+                  <div class="mb-2"><label for="{{ f.major.id_for_label }}">Major:</label> {{ f.major }}</div>
+                  <div class="mb-2"><label for="{{ f.degree.id_for_label }}">Degree:</label> {{ f.degree }}</div>
+                  {% if f.id.value %}<input type="hidden" name="{{ f.id.html_name }}" value="{{ f.id.value }}">{% endif %}
+                  {% if education_formset.can_delete %}
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-education">Remove Education</button>
+                    <span style="display:none;">{{ f.DELETE }}</span>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Work Experience</span>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="add-work">Add Work Experience</button>
+          </div>
+          <div class="card-body">
+            <div id="work-formset">
+              {{ work_formset.management_form }}
+              {% for f in work_formset %}
+                <div class="border rounded p-3 mb-3 work-item">
+                  <div class="mb-2"><label for="{{ f.company.id_for_label }}">Company:</label> {{ f.company }}</div>
+                  <div class="mb-2"><label for="{{ f.description.id_for_label }}">Description:</label> {{ f.description }}</div>
+                  {% if f.id.value %}<input type="hidden" name="{{ f.id.html_name }}" value="{{ f.id.value }}">{% endif %}
+                  {% if work_formset.can_delete %}
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-work">Remove Work Experience</button>
+                    <span style="display:none;">{{ f.DELETE }}</span>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-end mt-4">
+      <button type="submit" class="btn btn-primary">Save Profile</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  (function() {
+    // Projects functionality
+    const addProjectBtn = document.getElementById('add-project');
+    const projectContainer = document.getElementById('projects-formset');
+    if (addProjectBtn && projectContainer) {
+      addProjectBtn.addEventListener('click', function() {
+        const totalInput = projectContainer.querySelector('input[name$="-TOTAL_FORMS"]');
+        const total = parseInt(totalInput.value, 10);
+        const emptyTemplate = `
+          <div class="border rounded p-3 mb-3 project-item">
+            <div class="mb-2"><label for="id_projects-${total}-title">Title:</label> <input type="text" name="projects-${total}-title" class="form-control" id="id_projects-${total}-title"></div>
+            <div class="mb-2"><label for="id_projects-${total}-url">Url:</label> <input type="url" name="projects-${total}-url" class="form-control" id="id_projects-${total}-url"></div>
+            <div class="mb-2"><label for="id_projects-${total}-description">Description:</label> <textarea name="projects-${total}-description" class="form-control" id="id_projects-${total}-description"></textarea></div>
+            <button type="button" class="btn btn-sm btn-outline-danger remove-project">Remove Project</button>
+            <input type="hidden" name="projects-${total}-DELETE" id="id_projects-${total}-DELETE">
+          </div>`;
+        totalInput.value = total + 1;
+        projectContainer.insertAdjacentHTML('beforeend', emptyTemplate);
+      });
+    }
+
+    // Education functionality
+    const addEducationBtn = document.getElementById('add-education');
+    const educationContainer = document.getElementById('education-formset');
+    if (addEducationBtn && educationContainer) {
+      addEducationBtn.addEventListener('click', function() {
+        const totalInput = educationContainer.querySelector('input[name$="-TOTAL_FORMS"]');
+        const total = parseInt(totalInput.value, 10);
+        const emptyTemplate = `
+          <div class="border rounded p-3 mb-3 education-item">
+            <div class="mb-2"><label for="id_education-${total}-school">School:</label> <input type="text" name="education-${total}-school" class="form-control" id="id_education-${total}-school"></div>
+            <div class="row">
+              <div class="col-md-6 mb-2"><label for="id_education-${total}-graduation_month">Graduation Month:</label> <select name="education-${total}-graduation_month" class="form-control" id="id_education-${total}-graduation_month">
+                <option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option>
+                <option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option>
+                <option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option>
+              </select></div>
+              <div class="col-md-6 mb-2"><label for="id_education-${total}-graduation_year">Graduation Year:</label> <input type="number" name="education-${total}-graduation_year" class="form-control" id="id_education-${total}-graduation_year"></div>
+            </div>
+            <div class="mb-2"><label for="id_education-${total}-major">Major:</label> <input type="text" name="education-${total}-major" class="form-control" id="id_education-${total}-major"></div>
+            <div class="mb-2"><label for="id_education-${total}-degree">Degree:</label> <input type="text" name="education-${total}-degree" class="form-control" id="id_education-${total}-degree"></div>
+            <button type="button" class="btn btn-sm btn-outline-danger remove-education">Remove Education</button>
+            <input type="hidden" name="education-${total}-DELETE" id="id_education-${total}-DELETE">
+          </div>`;
+        totalInput.value = total + 1;
+        educationContainer.insertAdjacentHTML('beforeend', emptyTemplate);
+      });
+    }
+
+    // Work Experience functionality
+    const addWorkBtn = document.getElementById('add-work');
+    const workContainer = document.getElementById('work-formset');
+    if (addWorkBtn && workContainer) {
+      addWorkBtn.addEventListener('click', function() {
+        const totalInput = workContainer.querySelector('input[name$="-TOTAL_FORMS"]');
+        const total = parseInt(totalInput.value, 10);
+        const emptyTemplate = `
+          <div class="border rounded p-3 mb-3 work-item">
+            <div class="mb-2"><label for="id_work-${total}-company">Company:</label> <input type="text" name="work-${total}-company" class="form-control" id="id_work-${total}-company"></div>
+            <div class="mb-2"><label for="id_work-${total}-description">Description:</label> <textarea name="work-${total}-description" class="form-control" id="id_work-${total}-description"></textarea></div>
+            <button type="button" class="btn btn-sm btn-outline-danger remove-work">Remove Work Experience</button>
+            <input type="hidden" name="work-${total}-DELETE" id="id_work-${total}-DELETE">
+          </div>`;
+        totalInput.value = total + 1;
+        workContainer.insertAdjacentHTML('beforeend', emptyTemplate);
+      });
+    }
+
+    // Remove functionality for all formsets
+    document.addEventListener('click', function(e) {
+      if (e.target.classList.contains('remove-project')) {
+        const item = e.target.closest('.project-item');
+        const deleteInput = item.querySelector('input[name$="-DELETE"]');
+        if (deleteInput) {
+          deleteInput.checked = true;
+          deleteInput.value = 'on';
+          item.style.display = 'none';
+        } else {
+          item.remove();
+        }
+      } else if (e.target.classList.contains('remove-education')) {
+        const item = e.target.closest('.education-item');
+        const deleteInput = item.querySelector('input[name$="-DELETE"]');
+        if (deleteInput) {
+          deleteInput.checked = true;
+          deleteInput.value = 'on';
+          item.style.display = 'none';
+        } else {
+          item.remove();
+        }
+      } else if (e.target.classList.contains('remove-work')) {
+        const item = e.target.closest('.work-item');
+        const deleteInput = item.querySelector('input[name$="-DELETE"]');
+        if (deleteInput) {
+          deleteInput.checked = true;
+          deleteInput.value = 'on';
+          item.style.display = 'none';
+        } else {
+          item.remove();
+        }
+      }
+    });
+  })();
+</script>
 {% endblock %}
