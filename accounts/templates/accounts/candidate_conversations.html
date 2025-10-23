@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container py-4">
+  <div class="row">
+    <div class="col-12">
+      <h2 class="mb-4">Messages</h2>
+      
+      {% if template_data.conversations %}
+        <div class="list-group">
+          {% for conversation in template_data.conversations %}
+            <div class="list-group-item list-group-item-action">
+              <div class="d-flex w-100 justify-content-between">
+                <div class="d-flex align-items-center">
+                  {% if conversation.recruiter.profile.profile_picture %}
+                    <img src="{{ conversation.recruiter.profile.profile_picture.url }}" 
+                         class="rounded-circle me-3" width="50" height="50" alt="Profile picture">
+                  {% else %}
+                    <div class="rounded-circle bg-secondary me-3 d-flex align-items-center justify-content-center" 
+                         style="width: 50px; height: 50px;">
+                      <span class="text-white">{{ conversation.recruiter.username|first|upper }}</span>
+                    </div>
+                  {% endif %}
+                  <div>
+                    <h5 class="mb-1">{{ conversation.recruiter.username }}</h5>
+                    {% if conversation.job %}
+                      <small class="text-muted">About: {{ conversation.job.title }}</small>
+                    {% else %}
+                      <small class="text-muted">General conversation</small>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="text-end">
+                  <small class="text-muted">{{ conversation.updated_at|date:"M d, Y" }}</small>
+                  <div>
+                    <a href="{% url 'accounts.conversation_detail' conversation.id %}" 
+                       class="btn btn-primary btn-sm">View Messages</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-center py-5">
+          <h4 class="text-muted">No messages yet</h4>
+          <p class="text-muted">Recruiters will be able to contact you here when they're interested in your profile.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
