@@ -48,5 +48,25 @@ class Profile(models.Model):
     projects = models.ManyToManyField(Project, blank=True)
     education = models.ManyToManyField(Education, blank=True)
     work_experience = models.ManyToManyField(WorkExperience, blank=True)
+    PRIVACY_PUBLIC = "public"
+    PRIVACY_RECRUITERS = "recruiters"
+    PRIVACY_PRIVATE = "private"
+    PRIVACY_CHOICES = [
+        (PRIVACY_PUBLIC, "Public (anyone can view)"),
+        (PRIVACY_RECRUITERS, "Recruiters only"),
+        (PRIVACY_PRIVATE, "Private (only me)"),
+    ]
+
+    privacy_level = models.CharField(
+        max_length=20,
+        choices=PRIVACY_CHOICES,
+        default=PRIVACY_PUBLIC,
+        help_text="Who can see your profile."
+    )
+
+    show_email_to_recruiters = models.BooleanField(
+        default=False,
+        help_text="If on, recruiters can see your email on your profile page."
+    )
 
     def __str__(self): return f"{self.user.username} Profile"

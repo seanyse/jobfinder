@@ -27,20 +27,36 @@ class ProfileForm(forms.ModelForm):
             "headline", "bio", "location",
             "website", "github", "linkedin",
             "skills",
+ 
+            "privacy_level", "show_email_to_recruiters",
         ]
+        widgets = {
+            # optional, nicer radios
+            "privacy_level": forms.RadioSelect(choices=Profile.PRIVACY_CHOICES),
+        }
 
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ["title", "url", "description"]
+   
+        fields = ["title", "url", "description"]   
         widgets = {
             "title": TextInput(attrs={"class": "form-control"}),
             "url": URLInput(attrs={"class": "form-control"}),
             "description": Textarea(attrs={"class": "form-control"}),
         }
 
-ProjectFormSet = formset_factory(ProjectForm, extra=0, can_delete=True)
+ProjectFormSet = modelformset_factory(Project, form=ProjectForm, extra=0, can_delete=True)
 
+class ContactCandidateForm(forms.Form):
+    subject = forms.CharField(
+        max_length=120,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Subject"})
+    )
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 6, "class": "form-control", "placeholder": "Write your message"})
+    )
+    
 class EducationForm(forms.ModelForm):
     class Meta:
         model = Education

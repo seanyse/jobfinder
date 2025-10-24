@@ -37,6 +37,35 @@
       </div>
     </div>
 
+    <!-- Privacy -->
+    <div class="row g-4 mt-1">
+      <div class="col-md-12">
+        <div class="card h-100">
+          <div class="card-header">Privacy</div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label">Who can view your profile?</label>
+              {{ form.privacy_level }}
+              {# If you prefer radios, ensure the widget in forms.py uses RadioSelect #}
+            </div>
+
+            <div class="form-check">
+              {{ form.show_email_to_recruiters }}
+              <label class="form-check-label" for="{{ form.show_email_to_recruiters.id_for_label }}">
+                Allow recruiters to see my email on my profile
+              </label>
+            </div>
+
+            <small class="text-muted d-block mt-2">
+              • <strong>Public</strong>: Anyone can view your profile.<br>
+              • <strong>Recruiters only</strong>: Only logged-in recruiters can view.<br>
+              • <strong>Private</strong>: Only you can view.
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="row g-4 mt-1">
       <div class="col-md-6">
         <div class="card h-100">
