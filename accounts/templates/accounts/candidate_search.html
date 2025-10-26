@@ -52,10 +52,10 @@
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span>Search Results</span>
-          <span class="badge bg-primary">{{ results|length }} candidate{{ results|length|pluralize }}</span>
+          <span class="badge bg-primary">{{ results|length|add:users_without_profiles|length }} candidate{{ results|length|add:users_without_profiles|length|pluralize }}</span>
         </div>
         <div class="card-body">
-          {% if results %}
+          {% if results or users_without_profiles %}
             <div class="row g-3">
               {% for p in results %}
                 <div class="col-12">
@@ -97,6 +97,49 @@
                           <div class="mt-2">
                             <a href="{% url 'accounts.profile_detail' username=p.user.username %}" class="btn btn-sm btn-outline-primary">
                               View Profile
+                            </a>
+                            <a href="{% url 'accounts.start_conversation' p.user.id %}" class="btn btn-sm btn-primary">
+                              Message
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+              
+              {% for user in users_without_profiles %}
+                <div class="col-12">
+                  <div class="card border">
+                    <div class="card-body">
+                      <div class="row align-items-center">
+                        <div class="col-md-2 text-center">
+                          <div class="bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <i class="fas fa-user text-muted"></i>
+                          </div>
+                        </div>
+                        <div class="col-md-8">
+                          <h6 class="mb-1">
+                            <a href="{% url 'accounts.profile_detail' username=user.username %}" class="text-decoration-none">
+                              {{ user.username }}
+                            </a>
+                          </h6>
+                          <p class="mb-1 text-muted">Profile not created yet</p>
+                          <p class="mb-1">
+                            <i class="fas fa-map-marker-alt me-1"></i>Location not specified
+                          </p>
+                          <div class="mb-2">
+                            <span class="badge bg-warning">No skills listed</span>
+                          </div>
+                        </div>
+                        <div class="col-md-2 text-end">
+                          <div class="mt-2">
+                            <a href="{% url 'accounts.profile_detail' username=user.username %}" class="btn btn-sm btn-outline-primary">
+                              View Profile
+                            </a>
+                            <a href="{% url 'accounts.start_conversation' user.id %}" class="btn btn-sm btn-primary">
+                              Message
                             </a>
                           </div>
                         </div>

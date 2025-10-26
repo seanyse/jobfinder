@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container py-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Conversation with {{ template_data.other_user.username }}</h2>
+        <a href="{% url 'accounts.conversations_list' %}" class="btn btn-outline-secondary">Back to Messages</a>
+      </div>
+      
+      {% if template_data.conversation.job %}
+        <div class="alert alert-info">
+          <strong>About Job:</strong> {{ template_data.conversation.job.title }} at {{ template_data.conversation.job.company }}
+        </div>
+      {% endif %}
+      
+      <!-- Messages Area -->
+      <div class="card mb-4" style="height: 500px; overflow-y: auto;">
+        <div class="card-body">
+          {% if template_data.messages %}
+            {% for message in template_data.messages %}
+              <div class="mb-3 {% if message.sender == request.user %}text-end{% endif %}">
+                <div class="d-flex {% if message.sender == request.user %}justify-content-end{% endif %}">
+                  <div class="{% if message.sender == request.user %}bg-primary text-white{% else %}bg-light{% endif %} rounded p-3" 
+                       style="max-width: 70%;">
+                    <div class="fw-bold mb-1">{{ message.sender.username }}</div>
+                    <div>{{ message.content }}</div>
+                    <small class="{% if message.sender == request.user %}text-white-50{% else %}text-muted{% endif %}">
+                      {{ message.created_at|date:"M d, Y g:i A" }}
+                    </small>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="text-center text-muted py-5">
+              <p>No messages yet. Start the conversation!</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      
+      <!-- Message Form -->
+      <div class="card">
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+              {{ template_data.form.content }}
+            </div>
+            <button type="submit" class="btn btn-primary">Send Message</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Auto-scroll to bottom of messages
+document.addEventListener('DOMContentLoaded', function() {
+  const messagesContainer = document.querySelector('.card-body');
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+});
+</script>
+
+{% endblock %}

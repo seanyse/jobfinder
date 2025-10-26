@@ -5,6 +5,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
+{% csrf_token %}
+
 <div class="container my-4">
   <h1 class="mb-3">Jobs Near Me</h1>
 
@@ -15,11 +17,25 @@
     <div class="col-12 col-lg-3">
       <div class="card">
         <div class="card-body">
-          <h5>Filters</h5>
-          <label class="form-label" for="radius">Radius (km)</label>
-          <input id="radius" type="number" class="form-control" value="50" min="1" step="1" />
-          <button id="reload" class="btn btn-primary mt-2 w-100">Search Near Me</button>
+          <h5>Job Filters</h5>
+          
+          <div class="mb-3">
+            <label class="form-label" for="radius">Search Radius (km)</label>
+            <input id="radius" type="number" class="form-control" value="{{ template_data.preferred_radius }}" min="1" max="500" step="1" />
+            <small class="text-muted">Jobs within this distance from your location</small>
+          </div>
+          
+          <button id="reload" class="btn btn-primary w-100">Search Near Me</button>
+          
+          {% if user.is_authenticated %}
+          <div class="mt-3">
+            <button id="save-default" class="btn btn-outline-secondary w-100">Save as My Commute Preference</button>
+            <small class="text-muted d-block mt-1">Save this radius as your default commute distance</small>
+          </div>
+          {% endif %}
+          
           <hr/>
+          <h6>Jobs Found</h6>
           <div id="results" style="max-height: 350px; overflow:auto;">Loading...</div>
         </div>
       </div>
@@ -151,7 +167,7 @@ function renderJobs(jobs) {
 }
 
 function getRadius() {
-  return parseFloat(document.getElementById('radius').value) || 50;
+  return parseFloat(document.getElementById('radius').value) || {{ template_data.preferred_radius|default:50 }};
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -175,6 +191,110 @@ document.addEventListener('DOMContentLoaded', () => {
 
   doSearch();
   document.getElementById('reload').addEventListener('click', doSearch);
+  
+  // Save default radius functionality
+  document.getElementById('save-default').addEventListener('click', async function() {
+    const radius = getRadius();
+    console.log('Attempting to save commute radius:', radius);
+    
+    try {
+      // Get CSRF token from multiple sources
+      let csrfToken = null;
+      
+      // Try form field first
+      const csrfField = document.querySelector('[name=csrfmiddlewaretoken]');
+      if (csrfField) {
+        csrfToken = csrfField.value;
+        console.log('CSRF token from form field');
+      }
+      
+      // Try meta tag
+      if (!csrfToken) {
+        const csrfMeta = document.querySelector('meta[name=csrf-token]');
+        if (csrfMeta) {
+          csrfToken = csrfMeta.content;
+          console.log('CSRF token from meta tag');
+        }
+      }
+      
+      // Try cookie
+      if (!csrfToken) {
+        csrfToken = getCookie('csrftoken');
+        if (csrfToken) {
+          console.log('CSRF token from cookie');
+        }
+      }
+      
+      if (!csrfToken) {
+        console.error('No CSRF token found');
+        alert('CSRF token not found. Please refresh the page and try again.');
+        return;
+      }
+      
+      console.log('CSRF token found, making request...');
+      
+      const response = await fetch('/accounts/profile/update-commute-radius', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ commute_radius: radius })
+      });
+      
+      console.log('Response status:', response.status);
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Save successful:', data);
+          
+          // Show success message
+          const button = this;
+          const originalText = button.textContent;
+          button.textContent = 'Saved!';
+          button.classList.remove('btn-outline-secondary');
+          button.classList.add('btn-success');
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-secondary');
+          }, 2000);
+        } else {
+          const errorData = await response.json();
+          console.error('Save failed:', response.status, errorData);
+          alert(`Failed to save preference: ${errorData.error || 'Unknown error'}`);
+        }
+      } else {
+        // Response is not JSON (likely HTML redirect page)
+        console.error('Response is not JSON, likely a redirect');
+        const text = await response.text();
+        console.error('Response content:', text.substring(0, 200));
+        alert('Failed to save preference: Server returned unexpected response. Please check if you are logged in.');
+      }
+    } catch (error) {
+      console.error('Error saving commute radius:', error);
+      alert('Failed to save preference. Please try again.');
+    }
+  });
+  
+  // Helper function to get cookie value
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
 });
 </script>
 

@@ -203,14 +203,20 @@ def update_application_status(request, application_id):
     
     return redirect('jobs.manage_applications')
 
-@user_passes_test(is_seeker)
 def job_map(request):
-    template_data = {'title': 'Jobs Near Me'}
+    # Get user's preferred commute radius from their profile
+    preferred_radius = 50  # default
+    if request.user.is_authenticated and hasattr(request.user, 'profile'):
+        preferred_radius = request.user.profile.commute_radius
+    
+    template_data = {
+        'title': 'Jobs Near Me',
+        'preferred_radius': preferred_radius
+    }
     jobs = Job.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
     return render(request, 'jobs/job_map.html', {'template_data': template_data, 'jobs': jobs})
 
 @require_GET
-@user_passes_test(is_seeker)
 def jobs_geo_api(request):
     jobs = Job.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
     features = [{

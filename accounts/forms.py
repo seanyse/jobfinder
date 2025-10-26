@@ -1,7 +1,7 @@
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from .models import CustomUser
 from django import forms
-from .models import Profile, Skill, Project, Education, WorkExperience
+from .models import Profile, Skill, Project, Education, WorkExperience, Conversation, Message
 from django.forms import formset_factory, modelformset_factory, TextInput, URLInput, Textarea, Select
 
 class CustomUserCreationForm(UserCreationForm):
@@ -19,6 +19,12 @@ class ProfileForm(forms.ModelForm):
         queryset=Skill.objects.all(), required=False, widget=forms.CheckboxSelectMultiple
     )
     new_skills = forms.CharField(required=False, help_text="Comma-separated new skills to add")
+    commute_radius = forms.IntegerField(
+        min_value=1,
+        max_value=500,
+        widget=forms.NumberInput(attrs={'class': 'form-control'}),
+        help_text="Preferred commute radius in kilometers"
+    )
 
     class Meta:
         model = Profile
@@ -26,6 +32,7 @@ class ProfileForm(forms.ModelForm):
             "profile_picture",
             "headline", "bio", "location",
             "website", "github", "linkedin",
+            "commute_radius",
             "skills",
         ]
 
@@ -85,3 +92,16 @@ class CandidateSearchForm(forms.Form):
         initial=True,
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
+
+class MessageForm(forms.ModelForm):
+    """Form for sending messages"""
+    class Meta:
+        model = Message
+        fields = ['content']
+        widgets = {
+            'content': Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Type your message here...'
+            })
+        }
