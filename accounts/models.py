@@ -52,20 +52,14 @@ class Profile(models.Model):
     PRIVACY_PUBLIC = "public"
     PRIVACY_PRIVATE = "private"
     PRIVACY_CHOICES = [
-    (PRIVACY_PUBLIC, "Public (anyone can view)"),
-    (PRIVACY_PRIVATE, "Private (only me)"),  
-]
-
-
-    
+        (PRIVACY_PUBLIC, "Public (anyone can view)"),
+        (PRIVACY_PRIVATE, "Private (only me)"),
+    ]
     privacy_level = models.CharField(
         max_length=20,
         choices=PRIVACY_CHOICES,
-        default='public',
-        help_text=(
-            "Public: Recruiters can view your profile and find you in search. "
-            "Private: Recruiters cannot view your profile; you won’t appear in candidate search."
-        ),
+        default="public",
+        help_text="Who can see your profile.",
     )
 
     show_email_to_recruiters = models.BooleanField(

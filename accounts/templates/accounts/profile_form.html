@@ -42,25 +42,36 @@
     <!-- Privacy -->
     <div class="mb-3">
       <label class="form-label fw-semibold">Who can view your profile?</label>
-    
-      <div class="form-check">
-        <input class="form-check-input" type="radio" name="privacy_level" id="privacyPublic"
-               value="public" {% if form.instance.privacy_level == 'public' %}checked{% endif %}>
-        <label class="form-check-label" for="privacyPublic">Public</label>
-        <div class="form-text">
-          Recruiters can view your profile and find you in candidate search.
-        </div>
-      </div>
-    
-      <div class="form-check mt-2">
-        <input class="form-check-input" type="radio" name="privacy_level" id="privacyPrivate"
-               value="private" {% if form.instance.privacy_level == 'private' %}checked{% endif %}>
-        <label class="form-check-label" for="privacyPrivate">Private</label>
-        <div class="form-text">
-          Recruiters cannot view your profile; you won’t appear in candidate search.
-        </div>
+      {{ form.privacy_level }}  <!-- uses RadioSelect from the form -->
+      <div class="form-text">
+        Public: recruiters can find you. Private: recruiters cannot, and you won’t appear in search.
       </div>
     </div>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        const radios = document.querySelectorAll('input[name="privacy_level"]');
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      
+        radios.forEach(radio => {
+          radio.addEventListener('change', async e => {
+            const newValue = e.target.value;
+            console.log("Sending privacy:", newValue);
+      
+            await fetch("{% url 'accounts.profile_edit' %}", {
+              method: "POST",
+              headers: {
+                "X-CSRFToken": csrfToken,
+                "X-Requested-With": "XMLHttpRequest",  // ✅ key line
+              },
+              body: new URLSearchParams({ "privacy_level": newValue }),
+            })
+            .then(r => r.json())
+            .then(data => console.log("Server says:", data))
+            .catch(err => console.error(err));
+          });
+        });
+      });
+      </script>
     
 
     <div class="row g-4 mt-1">

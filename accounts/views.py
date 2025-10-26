@@ -59,6 +59,19 @@ User = get_user_model()
 def profile_edit(request):
     # US-1: create/edit own profile
     profile, _ = Profile.objects.get_or_create(user=request.user)
+    
+    if (
+        request.method == "POST"
+        and request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        and "privacy_level" in request.POST
+    ):
+        new_value = request.POST["privacy_level"]
+        print("AJAX toggle received:", new_value)
+        profile.privacy_level = new_value
+        profile.save(update_fields=["privacy_level"])
+        return JsonResponse({"status": "ok", "privacy_level": profile.privacy_level})
+
+   
     if request.method == "POST":
         form = ProfileForm(request.POST, request.FILES, instance=profile)
         project_formset = ProjectFormSet(request.POST, prefix="projects")
@@ -231,7 +244,7 @@ def profile_detail(request, username):
     return render(request, "accounts/profile_detail.html", {"user_obj": user_obj, "profile": profile})
 
 def edit_profile(request):
-    profile = request.user.profile  # or however you fetch it
+    profile, created = Profile.objects.get_or_create(user=request.user)
     if request.method == "POST":
         form = ProfileForm(request.POST, instance=profile)
         print("POST privacy_level =", request.POST.get("privacy_level"))  # TEMP debug
