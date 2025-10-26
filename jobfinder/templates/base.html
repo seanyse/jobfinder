@@ -16,6 +16,7 @@
     </script>
     <meta name="viewport" content="width=device-width,
       initial-scale=1" />
+    <meta name="csrf-token" content="{{ csrf_token }}">
   </head>
   <body>
     <!-- Header -->
@@ -46,12 +47,15 @@
 
           
           <a class="nav-link" href="{% url 'jobs.index' %}">Jobs</a>
+          <a class="nav-link" href="{% url 'jobs.map' %}">Jobs Map</a>
           {% if user.role == 'seeker' %}
           <a class="nav-link" href="{% url 'accounts.my_profile' %}">My Profile</a>
           <a class="nav-link" href="{% url 'jobs.my_applications' %}">Applications</a>
-          <a class="nav-link" href="{% url 'jobs.map' %}">Jobs Map</a>
+          <a class="nav-link" href="{% url 'jobs.saved_jobs' %}">Saved Jobs</a>
+          <a class="nav-link" href="{% url 'accounts.conversations_list' %}">Messages</a>
           {% elif user.role == 'recruiter' %}
           <a class="nav-link" href="{% url 'accounts.candidate_search' %}">Search Candidates</a>
+          <a class="nav-link" href="{% url 'accounts.conversations_list' %}">Messages</a>
           {% endif %}
           <a class="nav-link" href="{% url 'accounts.logout' %}">
             Logout ({{ user.username }})

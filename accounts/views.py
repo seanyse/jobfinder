@@ -1,15 +1,29 @@
 from django.shortcuts import render, redirect, get_object_or_404
+<<<<<<< HEAD
 from django.contrib.auth import login as auth_login, authenticate, logout as auth_logout, get_user_model
+=======
+from django.contrib.auth import login as auth_login, authenticate, logout as auth_logout
+>>>>>>> origin/main
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from .forms import CustomUserCreationForm
 from django.db.models import Q, Count, Value
 from django.contrib.auth import get_user_model
+<<<<<<< HEAD
 from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, ContactCandidateForm
 from .models import Profile, Education, WorkExperience, CustomUser
 from django.contrib import messages
 from django.core.mail import send_mail, EmailMessage, get_connection
 from django.http import HttpResponseForbidden
 from django.conf import settings
+=======
+from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, MessageForm
+from .models import Profile, Education, WorkExperience, Conversation, Message, CustomUser
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+import json
+>>>>>>> origin/main
 
 
 @login_required
@@ -264,6 +278,7 @@ def candidate_search(request):
     form = CandidateSearchForm(request.GET or None)
     results = None
     
+<<<<<<< HEAD
     # Always show results - either filtered or all candidates
     qs = (
         Profile.objects
@@ -271,6 +286,17 @@ def candidate_search(request):
         .select_related("user")
         .prefetch_related("skills", "projects")
     )
+=======
+    # Start with all job seekers (users with role='seeker')
+    User = get_user_model()
+    seeker_users = User.objects.filter(role='seeker')
+    
+    # Get profiles for these users, including those without profiles
+    qs = Profile.objects.filter(user__in=seeker_users).select_related("user").prefetch_related("skills", "projects")
+    
+    # Also get users without profiles to include them in search results
+    users_without_profiles = seeker_users.filter(profile__isnull=True)
+>>>>>>> origin/main
     
     if form.is_valid():
         loc = form.cleaned_data.get("location")
@@ -301,7 +327,154 @@ def candidate_search(request):
     
     results = qs.distinct()
 
-    return render(request, "accounts/candidate_search.html", {"form": form, "results": results})
+    return render(request, "accounts/candidate_search.html", {"form": form, "results": results, "users_without_profiles": users_without_profiles})
+
+def update_commute_radius(request):
+    """API endpoint to update user's preferred commute radius"""
+    # Only allow POST requests
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    # Check authentication manually to return JSON instead of redirecting
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        data = json.loads(request.body)
+        commute_radius = data.get('commute_radius')
+        
+        if not commute_radius or not isinstance(commute_radius, (int, float)):
+            return JsonResponse({'error': 'Invalid commute radius'}, status=400)
+        
+        if commute_radius < 1 or commute_radius > 500:
+            return JsonResponse({'error': 'Commute radius must be between 1 and 500 km'}, status=400)
+        
+        # Get or create user profile
+        profile, created = Profile.objects.get_or_create(user=request.user)
+        profile.commute_radius = int(commute_radius)
+        profile.save()
+        
+        return JsonResponse({'success': True, 'commute_radius': profile.commute_radius})
+    
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# Messaging views
+@login_required
+def conversations_list(request):
+    """List all conversations for the current user"""
+    if request.user.role == 'recruiter':
+        conversations = Conversation.objects.filter(recruiter=request.user).order_by('-updated_at')
+        template_name = 'accounts/recruiter_conversations.html'
+    elif request.user.role == 'seeker':
+        conversations = Conversation.objects.filter(candidate=request.user).order_by('-updated_at')
+        template_name = 'accounts/candidate_conversations.html'
+    else:
+        return redirect('home.index')
+    
+    template_data = {
+        'title': 'Messages',
+        'conversations': conversations
+    }
+    
+    return render(request, template_name, {'template_data': template_data})
+
+@login_required
+def conversation_detail(request, conversation_id):
+    """View and send messages in a conversation"""
+    conversation = get_object_or_404(Conversation, id=conversation_id)
+    
+    # Check if user is part of this conversation
+    if request.user not in [conversation.recruiter, conversation.candidate]:
+        messages.error(request, 'You are not authorized to view this conversation.')
+        return redirect('accounts.conversations_list')
+    
+    # Get messages for this conversation
+    messages_list = conversation.messages.all()
+    
+    # Mark messages as read for the current user
+    messages_list.exclude(sender=request.user).update(is_read=True)
+    
+    if request.method == 'POST':
+        form = MessageForm(request.POST)
+        if form.is_valid():
+            message = form.save(commit=False)
+            message.conversation = conversation
+            message.sender = request.user
+            message.save()
+            
+            # Update conversation timestamp
+            conversation.save()
+            
+            return redirect('accounts.conversation_detail', conversation_id=conversation.id)
+    else:
+        form = MessageForm()
+    
+    # Determine the other participant
+    other_user = conversation.candidate if request.user == conversation.recruiter else conversation.recruiter
+    
+    template_data = {
+        'title': f'Conversation with {other_user.username}',
+        'conversation': conversation,
+        'messages': messages_list,
+        'form': form,
+        'other_user': other_user
+    }
+    
+    return render(request, 'accounts/conversation_detail.html', {'template_data': template_data})
+
+@login_required
+def start_conversation(request, candidate_id):
+    """Start a new conversation with a candidate (recruiters only)"""
+    if request.user.role != 'recruiter':
+        messages.error(request, 'Only recruiters can start conversations.')
+        return redirect('home.index')
+    
+    candidate = get_object_or_404(CustomUser, id=candidate_id, role='seeker')
+    
+    # Check if conversation already exists
+    conversation, created = Conversation.objects.get_or_create(
+        recruiter=request.user,
+        candidate=candidate
+    )
+    
+    if created:
+        messages.success(request, f'Started conversation with {candidate.username}')
+    else:
+        messages.info(request, f'Conversation with {candidate.username} already exists')
+    
+    return redirect('accounts.conversation_detail', conversation_id=conversation.id)
+
+@login_required
+def start_conversation_with_job(request, candidate_id, job_id):
+    """Start a new conversation with a candidate about a specific job"""
+    if request.user.role != 'recruiter':
+        messages.error(request, 'Only recruiters can start conversations.')
+        return redirect('home.index')
+    
+    candidate = get_object_or_404(CustomUser, id=candidate_id, role='seeker')
+    job = get_object_or_404('jobs.Job', id=job_id)
+    
+    # Verify the recruiter owns the job
+    if job.posted_by != request.user:
+        messages.error(request, 'You can only start conversations about your own jobs.')
+        return redirect('home.index')
+    
+    # Check if conversation already exists for this job
+    conversation, created = Conversation.objects.get_or_create(
+        recruiter=request.user,
+        candidate=candidate,
+        job=job
+    )
+    
+    if created:
+        messages.success(request, f'Started conversation with {candidate.username} about {job.title}')
+    else:
+        messages.info(request, f'Conversation with {candidate.username} about {job.title} already exists')
+    
+    return redirect('accounts.conversation_detail', conversation_id=conversation.id)
 
 def safe_send_email(subject, body, to_email, from_email=None):
     """

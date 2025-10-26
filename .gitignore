@@ -9,3 +9,7 @@ staticfiles/
 __pycache__/
 *.py[cod]
 *.pyo
+
+__pycache__/
+*.py[cod]
+*.pyo

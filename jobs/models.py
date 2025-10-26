@@ -57,3 +57,16 @@ class Application(models.Model):
     
     def __str__(self):
         return f"{self.applicant.username} -> {self.job.title} ({self.status})"
+
+class SavedJob(models.Model):
+    """Allows job seekers to save/bookmark jobs for later viewing"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='saved_jobs')
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='saved_by')
+    saved_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('user', 'job')  # Prevent duplicate bookmarks
+        ordering = ['-saved_at']
+    
+    def __str__(self):
+        return f"{self.user.username} saved {self.job.title}"

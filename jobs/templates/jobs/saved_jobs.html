@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">
+        <i class="fas fa-bookmark text-warning"></i> My Saved Jobs
+    </h2>
+    
+    {% if template_data.saved_jobs %}
+        <div class="row">
+            {% for saved_job in template_data.saved_jobs %}
+                <div class="col-12 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h5 class="card-title">{{ saved_job.job.title }}</h5>
+                                    <p class="text-muted mb-1">
+                                        <strong>Skills:</strong> {{ saved_job.job.skills }}
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <strong>Location:</strong> {{ saved_job.job.location|default:"Not specified" }}
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <strong>Salary:</strong>
+                                        {% if saved_job.job.salary %}
+                                            ${{ saved_job.job.salary }}
+                                        {% else %}
+                                            Not listed
+                                        {% endif %}
+                                    </p>
+                                    <p class="text-muted mb-0">
+                                        <strong>Saved on:</strong> {{ saved_job.saved_at|date:"F d, Y" }}
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <a href="{% url 'jobs.detail' job_id=saved_job.job.id %}" class="btn btn-primary mb-2">
+                                        View Details
+                                    </a>
+                                    <a href="{% url 'jobs.toggle_save' job_id=saved_job.job.id %}" class="btn btn-outline-danger btn-sm">
+                                        <i class="fas fa-bookmark"></i> Remove
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-bookmark fa-4x text-muted mb-3"></i>
+            <h4 class="text-muted">No saved jobs yet</h4>
+            <p class="text-muted">Start saving jobs that interest you!</p>
+            <a href="{% url 'jobs.index' %}" class="btn btn-primary">Browse Jobs</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock content %}

@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Case, When, IntegerField
-from .models import Job, Application
+from .models import Job, Application, SavedJob
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
@@ -45,6 +45,9 @@ def index(request):
         
         # Get user's applications to show which jobs they've already applied to
         user_applications = Application.objects.filter(applicant=request.user).values_list('job_id', flat=True)
+        
+        # Get user's saved jobs
+        user_saved_jobs = SavedJob.objects.filter(user=request.user).values_list('job_id', flat=True)
 
     elif request.user.role == 'recruiter':
         # For recruiters, sort their jobs on top
@@ -56,12 +59,14 @@ def index(request):
             )
         ).order_by('is_mine', '-created_at')
         user_applications = []
+        user_saved_jobs = []
 
     template_data = {
         'title': 'Jobs',
         'jobs': jobs,
         'filters': filters,
         'user_applications': user_applications,
+        'user_saved_jobs': user_saved_jobs if request.user.is_authenticated and request.user.role == 'seeker' else [],
     }
 
     return render(request, 'jobs/job_listings.html', {'template_data': template_data})
@@ -203,14 +208,20 @@ def update_application_status(request, application_id):
     
     return redirect('jobs.manage_applications')
 
-@user_passes_test(is_seeker)
 def job_map(request):
-    template_data = {'title': 'Jobs Near Me'}
+    # Get user's preferred commute radius from their profile
+    preferred_radius = 50  # default
+    if request.user.is_authenticated and hasattr(request.user, 'profile'):
+        preferred_radius = request.user.profile.commute_radius
+    
+    template_data = {
+        'title': 'Jobs Near Me',
+        'preferred_radius': preferred_radius
+    }
     jobs = Job.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
     return render(request, 'jobs/job_map.html', {'template_data': template_data, 'jobs': jobs})
 
 @require_GET
-@user_passes_test(is_seeker)
 def jobs_geo_api(request):
     jobs = Job.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
     features = [{
@@ -264,12 +275,18 @@ def job_detail(request, job_id):
     # Split skills into a list
     skills_list = [skill.strip() for skill in job.skills.split(',') if skill.strip()]
     
+    # Get user's saved jobs (for seekers)
+    user_saved_jobs = []
+    if request.user.is_authenticated and request.user.role == 'seeker':
+        user_saved_jobs = SavedJob.objects.filter(user=request.user).values_list('job_id', flat=True)
+    
     template_data = {
         'title': f'Job Details - {job.title}',
         'job': job,
         'user_application': user_application,
         'job_applications': job_applications,
         'skills_list': skills_list,
+        'user_saved_jobs': user_saved_jobs,
     }
     
     return render(request, 'jobs/job_detail.html', {'template_data': template_data})
@@ -332,3 +349,33 @@ def track_status(request, job_id):
     }
     
     return render(request, 'jobs/track_status.html', {'template_data': template_data})
+
+@login_required
+@user_passes_test(is_seeker)
+def toggle_save_job(request, job_id):
+    """Toggle saving/unsaving a job"""
+    job = get_object_or_404(Job, id=job_id)
+    
+    saved_job, created = SavedJob.objects.get_or_create(user=request.user, job=job)
+    
+    if created:
+        messages.success(request, f'Job "{job.title}" saved!')
+    else:
+        saved_job.delete()
+        messages.info(request, f'Job "{job.title}" removed from saved jobs')
+    
+    # Redirect back to where they came from, or job list
+    return redirect(request.META.get('HTTP_REFERER', 'jobs.index'))
+
+@login_required
+@user_passes_test(is_seeker)
+def saved_jobs(request):
+    """View all saved jobs for the current user"""
+    saved_jobs = SavedJob.objects.filter(user=request.user).select_related('job')
+    
+    template_data = {
+        'title': 'My Saved Jobs',
+        'saved_jobs': saved_jobs,
+    }
+    
+    return render(request, 'jobs/saved_jobs.html', {'template_data': template_data})
