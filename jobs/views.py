@@ -275,12 +275,18 @@ def job_detail(request, job_id):
     # Split skills into a list
     skills_list = [skill.strip() for skill in job.skills.split(',') if skill.strip()]
     
+    # Get user's saved jobs (for seekers)
+    user_saved_jobs = []
+    if request.user.is_authenticated and request.user.role == 'seeker':
+        user_saved_jobs = SavedJob.objects.filter(user=request.user).values_list('job_id', flat=True)
+    
     template_data = {
         'title': f'Job Details - {job.title}',
         'job': job,
         'user_application': user_application,
         'job_applications': job_applications,
         'skills_list': skills_list,
+        'user_saved_jobs': user_saved_jobs,
     }
     
     return render(request, 'jobs/job_detail.html', {'template_data': template_data})
