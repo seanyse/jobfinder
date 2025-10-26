@@ -23,17 +23,16 @@ class ProfileForm(forms.ModelForm):
     class Meta:
         model = Profile
         fields = [
-            "profile_picture",
-            "headline", "bio", "location",
-            "website", "github", "linkedin",
-            "skills",
- 
-            "privacy_level", "show_email_to_recruiters",
+            "profile_picture", "headline", "bio", "location",
+            "website", "github", "linkedin", "skills",
+            "privacy_level",                
         ]
-        widgets = {
-            # optional, nicer radios
-            "privacy_level": forms.RadioSelect(choices=Profile.PRIVACY_CHOICES),
-        }
+        widgets = {"privacy_level": forms.RadioSelect()}
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # Force the choices to exactly what's on the model
+            self.fields["privacy_level"].choices = Profile.PRIVACY_CHOICES
 
 class ProjectForm(forms.ModelForm):
     class Meta:

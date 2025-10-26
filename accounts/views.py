@@ -197,13 +197,14 @@ def profile_edit(request):
     })
 
 def can_view_profile(viewer, profile_owner, profile: Profile) -> bool:
+    # Owner can always view
     if viewer.is_authenticated and viewer == profile_owner:
         return True
+    # Public is world-visible (including recruiters)
     if profile.privacy_level == Profile.PRIVACY_PUBLIC:
         return True
-    if profile.privacy_level == Profile.PRIVACY_RECRUITERS:
-        return viewer.is_authenticated and getattr(viewer, "role", None) == "recruiter"
-    return False  # private
+    # Private blocks non-owners (including recruiters)
+    return False
 
 @login_required
 def my_profile(request):
@@ -229,13 +230,34 @@ def profile_detail(request, username):
 
     return render(request, "accounts/profile_detail.html", {"user_obj": user_obj, "profile": profile})
 
+def edit_profile(request):
+    profile = request.user.profile  # or however you fetch it
+    if request.method == "POST":
+        form = ProfileForm(request.POST, instance=profile)
+        print("POST privacy_level =", request.POST.get("privacy_level"))  # TEMP debug
+        if form.is_valid():
+            obj = form.save()     # <- save instance
+            print("SAVED privacy_level =", obj.privacy_level)  # TEMP debug
+            messages.success(request, "Profile updated.")
+            return redirect("profile_settings")  # PRG pattern
+        else:
+            print("FORM ERRORS:", form.errors)   # TEMP debug
+    else:
+        form = ProfileForm(instance=profile)
+    return render(request, "accounts/profile_form.html", {"form": form})
+
 def candidate_search(request):
     # US-11: recruiter searches candidates
     form = CandidateSearchForm(request.GET or None)
     results = None
     
     # Always show results - either filtered or all candidates
-    qs = Profile.objects.select_related("user").prefetch_related("skills", "projects")
+    qs = (
+        Profile.objects
+        .filter(privacy_level=Profile.PRIVACY_PUBLIC)   
+        .select_related("user")
+        .prefetch_related("skills", "projects")
+    )
     
     if form.is_valid():
         loc = form.cleaned_data.get("location")
