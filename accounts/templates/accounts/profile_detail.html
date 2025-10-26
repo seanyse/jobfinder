@@ -1,5 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
+<<<<<<< HEAD
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0">{{ user_obj.username }}'s Profile</h2>
+  <div class="d-flex align-items-center gap-2">
+    {# Show Contact when a logged-in recruiter is viewing a candidate who is not themselves #}
+    {% if user.is_authenticated and user.role == 'recruiter' and user.username != user_obj.username %}
+      <a href="{% url 'accounts.contact_candidate' username=user_obj.username %}" class="btn btn-success">
+        <i class="fas fa-envelope me-1"></i>Contact
+      </a>
+    {% endif %}
+
+    {# Keep the Edit button for the profile owner #}
+    {% if user.is_authenticated and user.username == user_obj.username %}
+      <a href="{% url 'accounts.profile_edit' %}" class="btn btn-primary">
+        <i class="fas fa-edit me-1"></i>Edit Profile
+      </a>
+    {% endif %}
+=======
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="mb-0">{{ user_obj.username }}'s Profile</h2>
@@ -14,7 +32,9 @@
         </a>
       {% endif %}
     </div>
+>>>>>>> origin/main
   </div>
+</div>
   
   <div class="row g-4">
     <div class="col-md-4">

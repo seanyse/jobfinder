@@ -33,21 +33,37 @@ class ProfileForm(forms.ModelForm):
             "headline", "bio", "location",
             "website", "github", "linkedin",
             "commute_radius",
-            "skills",
+            "skills", "privacy_level"
         ]
+        widgets = {"privacy_level": forms.RadioSelect()}
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # Force the choices to exactly what's on the model
+            self.fields["privacy_level"].choices = Profile.PRIVACY_CHOICES
 
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ["title", "url", "description"]
+   
+        fields = ["title", "url", "description"]   
         widgets = {
             "title": TextInput(attrs={"class": "form-control"}),
             "url": URLInput(attrs={"class": "form-control"}),
             "description": Textarea(attrs={"class": "form-control"}),
         }
 
-ProjectFormSet = formset_factory(ProjectForm, extra=0, can_delete=True)
+ProjectFormSet = modelformset_factory(Project, form=ProjectForm, extra=0, can_delete=True)
 
+class ContactCandidateForm(forms.Form):
+    subject = forms.CharField(
+        max_length=120,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Subject"})
+    )
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 6, "class": "form-control", "placeholder": "Write your message"})
+    )
+    
 class EducationForm(forms.ModelForm):
     class Meta:
         model = Education

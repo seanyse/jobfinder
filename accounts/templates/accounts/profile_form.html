@@ -4,7 +4,9 @@
   <h2 class="mb-3">My Profile</h2>
   <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
     {% csrf_token %}
-    {{ form.non_field_errors }}
+
+
+    
 
     <div class="row g-4">
       <div class="col-md-4">
@@ -43,6 +45,41 @@
         </div>
       </div>
     </div>
+
+    <!-- Privacy -->
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Who can view your profile?</label>
+      {{ form.privacy_level }}  <!-- uses RadioSelect from the form -->
+      <div class="form-text">
+        Public: recruiters can find you. Private: recruiters cannot, and you won’t appear in search.
+      </div>
+    </div>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        const radios = document.querySelectorAll('input[name="privacy_level"]');
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      
+        radios.forEach(radio => {
+          radio.addEventListener('change', async e => {
+            const newValue = e.target.value;
+            console.log("Sending privacy:", newValue);
+      
+            await fetch("{% url 'accounts.profile_edit' %}", {
+              method: "POST",
+              headers: {
+                "X-CSRFToken": csrfToken,
+                "X-Requested-With": "XMLHttpRequest",  // ✅ key line
+              },
+              body: new URLSearchParams({ "privacy_level": newValue }),
+            })
+            .then(r => r.json())
+            .then(data => console.log("Server says:", data))
+            .catch(err => console.error(err));
+          });
+        });
+      });
+      </script>
+    
 
     <div class="row g-4 mt-1">
       <div class="col-md-6">

@@ -98,6 +98,14 @@
                             <a href="{% url 'accounts.profile_detail' username=p.user.username %}" class="btn btn-sm btn-outline-primary">
                               View Profile
                             </a>
+<<<<<<< HEAD
+                            {% if user.is_authenticated and user.role == 'recruiter' %}
+                              <a class="btn btn-sm btn-success ms-2" href="{% url 'accounts.contact_candidate' username=p.user.username %}">
+                                <i class="fas fa-envelope me-1"></i>Contact
+                              </a>
+                            {% endif %}
+                          </div>
+=======
                             <a href="{% url 'accounts.start_conversation' p.user.id %}" class="btn btn-sm btn-primary">
                               Message
                             </a>
@@ -151,6 +159,7 @@
                                 <i class="fas fa-envelope me-1"></i>Email
                               </a>
                             {% endif %}
+>>>>>>> origin/main
                           </div>
                         </div>
                       </div>

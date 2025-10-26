@@ -1,16 +1,29 @@
 from django.shortcuts import render, redirect, get_object_or_404
+<<<<<<< HEAD
+from django.contrib.auth import login as auth_login, authenticate, logout as auth_logout, get_user_model
+=======
 from django.contrib.auth import login as auth_login, authenticate, logout as auth_logout
+>>>>>>> origin/main
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .forms import CustomUserCreationForm
 from django.db.models import Q, Count, Value
 from django.contrib.auth import get_user_model
+<<<<<<< HEAD
+from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, ContactCandidateForm
+from .models import Profile, Education, WorkExperience, CustomUser
+from django.contrib import messages
+from django.core.mail import send_mail, EmailMessage, get_connection
+from django.http import HttpResponseForbidden
+from django.conf import settings
+=======
 from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, MessageForm
 from .models import Profile, Education, WorkExperience, Conversation, Message, CustomUser
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 import json
+>>>>>>> origin/main
 
 
 @login_required
@@ -60,6 +73,19 @@ User = get_user_model()
 def profile_edit(request):
     # US-1: create/edit own profile
     profile, _ = Profile.objects.get_or_create(user=request.user)
+    
+    if (
+        request.method == "POST"
+        and request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        and "privacy_level" in request.POST
+    ):
+        new_value = request.POST["privacy_level"]
+        print("AJAX toggle received:", new_value)
+        profile.privacy_level = new_value
+        profile.save(update_fields=["privacy_level"])
+        return JsonResponse({"status": "ok", "privacy_level": profile.privacy_level})
+
+   
     if request.method == "POST":
         form = ProfileForm(request.POST, request.FILES, instance=profile)
         project_formset = ProjectFormSet(request.POST, prefix="projects")
@@ -197,23 +223,70 @@ def profile_edit(request):
         "work_formset": work_formset
     })
 
+def can_view_profile(viewer, profile_owner, profile: Profile) -> bool:
+    # Owner can always view
+    if viewer.is_authenticated and viewer == profile_owner:
+        return True
+    # Public is world-visible (including recruiters)
+    if profile.privacy_level == Profile.PRIVACY_PUBLIC:
+        return True
+    # Private blocks non-owners (including recruiters)
+    return False
+
 @login_required
 def my_profile(request):
     # Redirect to profile detail view for the current user
     return redirect("accounts.profile_detail", username=request.user.username)
 
 def profile_detail(request, username):
-    user = User.objects.filter(username=username).first()
-    if not user:
-        return redirect("home.index")
-    profile = getattr(user, "profile", None)
-    return render(request, "accounts/profile_detail.html", {"user_obj": user, "profile": profile})
+    User = get_user_model()
+    user_obj = get_object_or_404(User, username=username)
+
+    # Some users may not have a profile yet
+    profile = getattr(user_obj, "profile", None)
+    if profile is None:
+        # Owner sees their empty profile page to encourage editing,
+        # others get a friendly private message
+        if request.user.is_authenticated and request.user == user_obj:
+            return render(request, "accounts/profile_detail.html", {"user_obj": user_obj, "profile": profile})
+        return render(request, "accounts/profile_private.html", {"user_obj": user_obj}, status=403)
+
+    # Enforce privacy settings
+    if not can_view_profile(request.user, user_obj, profile):
+        return render(request, "accounts/profile_private.html", {"user_obj": user_obj}, status=403)
+
+    return render(request, "accounts/profile_detail.html", {"user_obj": user_obj, "profile": profile})
+
+def edit_profile(request):
+    profile, created = Profile.objects.get_or_create(user=request.user)
+    if request.method == "POST":
+        form = ProfileForm(request.POST, instance=profile)
+        print("POST privacy_level =", request.POST.get("privacy_level"))  # TEMP debug
+        if form.is_valid():
+            obj = form.save()     # <- save instance
+            print("SAVED privacy_level =", obj.privacy_level)  # TEMP debug
+            messages.success(request, "Profile updated.")
+            return redirect("profile_settings")  # PRG pattern
+        else:
+            print("FORM ERRORS:", form.errors)   # TEMP debug
+    else:
+        form = ProfileForm(instance=profile)
+    return render(request, "accounts/profile_form.html", {"form": form})
 
 def candidate_search(request):
     # US-11: recruiter searches candidates
     form = CandidateSearchForm(request.GET or None)
     results = None
     
+<<<<<<< HEAD
+    # Always show results - either filtered or all candidates
+    qs = (
+        Profile.objects
+        .filter(privacy_level=Profile.PRIVACY_PUBLIC)   
+        .select_related("user")
+        .prefetch_related("skills", "projects")
+    )
+=======
     # Start with all job seekers (users with role='seeker')
     User = get_user_model()
     seeker_users = User.objects.filter(role='seeker')
@@ -223,6 +296,7 @@ def candidate_search(request):
     
     # Also get users without profiles to include them in search results
     users_without_profiles = seeker_users.filter(profile__isnull=True)
+>>>>>>> origin/main
     
     if form.is_valid():
         loc = form.cleaned_data.get("location")
@@ -402,3 +476,82 @@ def start_conversation_with_job(request, candidate_id, job_id):
     
     return redirect('accounts.conversation_detail', conversation_id=conversation.id)
 
+def safe_send_email(subject, body, to_email, from_email=None):
+    """
+    Try the configured backend first. If it fails, fall back to console backend.
+    Returns (sent_ok: bool, fallback_used: bool, error_message: str|None)
+    """
+    try:
+        # Try the configured backend (from settings)
+        EmailMessage(subject, body, from_email, [to_email]).send(fail_silently=False)
+        return True, False, None
+    except Exception as e:
+        # Fallback: console backend (prints to terminal instead of connecting)
+        try:
+            conn = get_connection("django.core.mail.backends.console.EmailBackend")
+            EmailMessage(subject, body, from_email, [to_email], connection=conn).send(fail_silently=True)
+            return True, True, str(e)
+        except Exception as e2:
+            return False, True, f"{e} | fallback failed: {e2}"
+
+@login_required
+def contact_candidate(request, username):
+    # Only recruiters can send messages
+    if not hasattr(request.user, "role") or request.user.role != "recruiter":
+        return HttpResponseForbidden("Only recruiters can contact candidates.")
+
+    # Use AUTH_USER_MODEL for safety
+    User = get_user_model()
+    candidate = get_object_or_404(User, username=username, role="seeker")
+    if not candidate.email:
+        messages.error(request, "This candidate has no email on file.")
+        return redirect("accounts.profile_detail", username=username)
+
+    if request.method == "POST":
+        form = ContactCandidateForm(request.POST)
+        if form.is_valid():
+            subject = form.cleaned_data["subject"]
+            msg = form.cleaned_data["message"]
+
+            email_subject = f"[JobFinder] {subject}"
+            body = (
+                f"Hello {candidate.first_name or candidate.username},\n\n"
+                f"{msg}\n\n"
+                f"---\nSent via JobFinder by "
+                f"{request.user.get_full_name() or request.user.username} ({request.user.email})"
+            )
+
+            # Try configured backend first; on failure, fall back to console backend
+            try:
+                EmailMessage(
+                    subject=email_subject,
+                    body=body,
+                    from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                    to=[candidate.email],
+                ).send(fail_silently=False)
+                messages.success(request, f"Email sent to {candidate.username}.")
+            except Exception as e:
+                # Fallback: send to console so dev flow still “succeeds”
+                conn = get_connection("django.core.mail.backends.console.EmailBackend")
+                EmailMessage(
+                    subject=email_subject,
+                    body=body,
+                    from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                    to=[candidate.email],
+                    connection=conn,
+                ).send(fail_silently=True)
+                messages.success(request, f"Email sent to {candidate.username} (console fallback).")
+
+            return redirect("accounts.profile_detail", username=username)
+    else:
+        form = ContactCandidateForm(initial={
+            "subject": "Opportunity regarding your profile",
+            "message": (
+                f"Hi {candidate.first_name or candidate.username},\n\n"
+                "I came across your profile on JobFinder and think you'd be a great fit for a role "
+                "we're hiring for. If you're open to it, I'd love to share details and set up a quick chat.\n\n"
+                f"Best,\n{request.user.get_full_name() or request.user.username}"
+            ),
+        })
+
+    return render(request, "accounts/contact_candidate.html", {"form": form, "candidate": candidate})
