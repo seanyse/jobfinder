@@ -50,6 +50,7 @@
           {% if user.role == 'seeker' %}
           <a class="nav-link" href="{% url 'accounts.my_profile' %}">My Profile</a>
           <a class="nav-link" href="{% url 'jobs.my_applications' %}">Applications</a>
+          <a class="nav-link" href="{% url 'jobs.saved_jobs' %}">Saved Jobs</a>
           <a class="nav-link" href="{% url 'accounts.conversations_list' %}">Messages</a>
           {% elif user.role == 'recruiter' %}
           <a class="nav-link" href="{% url 'accounts.candidate_search' %}">Search Candidates</a>

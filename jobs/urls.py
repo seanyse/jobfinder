@@ -15,4 +15,8 @@ urlpatterns = [
     path('my-applications/', views.my_applications, name='jobs.my_applications'),
     path('manage-applications/', views.manage_applications, name='jobs.manage_applications'),
     path('applications/<int:application_id>/update/', views.update_application_status, name='jobs.update_application_status'),
+    
+    # Bookmark URLs
+    path('<int:job_id>/save/', views.toggle_save_job, name='jobs.toggle_save'),
+    path('saved/', views.saved_jobs, name='jobs.saved_jobs'),
 ]
