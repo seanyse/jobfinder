@@ -10,9 +10,6 @@ urlpatterns = [
     path('profile/edit/', views.profile_edit, name='accounts.profile_edit'),
     path('profile/<str:username>/', views.profile_detail, name='accounts.profile_detail'),
     path('recruiter/search/', views.candidate_search, name='accounts.candidate_search'),
-<<<<<<< HEAD
-    
-=======
     path('profile/update-commute-radius', views.update_commute_radius, name='accounts.update_commute_radius'),
     
     # Messaging URLs
@@ -20,5 +17,4 @@ urlpatterns = [
     path('messages/<int:conversation_id>/', views.conversation_detail, name='accounts.conversation_detail'),
     path('messages/start/<int:candidate_id>/', views.start_conversation, name='accounts.start_conversation'),
     path('messages/start/<int:candidate_id>/job/<int:job_id>/', views.start_conversation_with_job, name='accounts.start_conversation_with_job'),
->>>>>>> origin/main
 ]

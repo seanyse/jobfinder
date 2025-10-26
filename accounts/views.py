@@ -1,29 +1,14 @@
 from django.shortcuts import render, redirect, get_object_or_404
-<<<<<<< HEAD
 from django.contrib.auth import login as auth_login, authenticate, logout as auth_logout, get_user_model
-=======
-from django.contrib.auth import login as auth_login, authenticate, logout as auth_logout
->>>>>>> origin/main
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .forms import CustomUserCreationForm
-from django.db.models import Q, Count, Value
-from django.contrib.auth import get_user_model
-<<<<<<< HEAD
-from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, ContactCandidateForm
-from .models import Profile, Education, WorkExperience, CustomUser
-from django.contrib import messages
-from django.core.mail import send_mail, EmailMessage, get_connection
-from django.http import HttpResponseForbidden
-from django.conf import settings
-=======
 from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, MessageForm
 from .models import Profile, Education, WorkExperience, Conversation, Message, CustomUser
+from django.db.models import Q, Count, Value
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 import json
->>>>>>> origin/main
 
 
 @login_required
@@ -278,25 +263,18 @@ def candidate_search(request):
     form = CandidateSearchForm(request.GET or None)
     results = None
     
-<<<<<<< HEAD
-    # Always show results - either filtered or all candidates
-    qs = (
-        Profile.objects
-        .filter(privacy_level=Profile.PRIVACY_PUBLIC)   
-        .select_related("user")
-        .prefetch_related("skills", "projects")
-    )
-=======
     # Start with all job seekers (users with role='seeker')
     User = get_user_model()
     seeker_users = User.objects.filter(role='seeker')
     
-    # Get profiles for these users, including those without profiles
-    qs = Profile.objects.filter(user__in=seeker_users).select_related("user").prefetch_related("skills", "projects")
+    # Get profiles for these users with public privacy level
+    qs = Profile.objects.filter(
+        user__in=seeker_users,
+        privacy_level=Profile.PRIVACY_PUBLIC
+    ).select_related("user").prefetch_related("skills", "projects")
     
     # Also get users without profiles to include them in search results
     users_without_profiles = seeker_users.filter(profile__isnull=True)
->>>>>>> origin/main
     
     if form.is_valid():
         loc = form.cleaned_data.get("location")

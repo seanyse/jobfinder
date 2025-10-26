@@ -68,14 +68,11 @@ class Profile(models.Model):
         help_text="Who can see your profile.",
     )
 
-<<<<<<< HEAD
     show_email_to_recruiters = models.BooleanField(
         default=False,
         help_text="If on, recruiters can see your email on your profile page."
     )
 
-    def __str__(self): return f"{self.user.username} Profile"
-=======
     def __str__(self): return f"{self.user.username} Profile"
 
 class Conversation(models.Model):
@@ -105,4 +102,3 @@ class Message(models.Model):
     
     def __str__(self):
         return f"{self.sender.username}: {self.content[:50]}..."
->>>>>>> origin/main
