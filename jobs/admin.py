@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Job, Application
+from .models import Job, Application, SavedJob
 import csv
 from django.http import HttpResponse
 
@@ -110,4 +110,11 @@ class ApplicationAdmin(admin.ModelAdmin):
         return response
 
     export_applications_as_csv.short_description = "Export selected Applications as CSV"
+
+@admin.register(SavedJob)
+class SavedJobAdmin(admin.ModelAdmin):
+    list_display = ("user", "job", "saved_at")
+    search_fields = ("user__username", "job__title")
+    list_filter = ("saved_at",)
+    ordering = ("-saved_at",)
 
