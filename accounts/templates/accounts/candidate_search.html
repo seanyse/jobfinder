@@ -101,6 +101,11 @@
                             <a href="{% url 'accounts.start_conversation' p.user.id %}" class="btn btn-sm btn-primary">
                               Message
                             </a>
+                            {% if p.user.email %}
+                              <a href="mailto:{{ p.user.email }}" class="btn btn-sm btn-success mt-1 d-block">
+                                <i class="fas fa-envelope me-1"></i>Email
+                              </a>
+                            {% endif %}
                           </div>
                         </div>
                       </div>
@@ -141,6 +146,11 @@
                             <a href="{% url 'accounts.start_conversation' user.id %}" class="btn btn-sm btn-primary">
                               Message
                             </a>
+                            {% if user.email %}
+                              <a href="mailto:{{ user.email }}" class="btn btn-sm btn-success mt-1 d-block">
+                                <i class="fas fa-envelope me-1"></i>Email
+                              </a>
+                            {% endif %}
                           </div>
                         </div>
                       </div>
