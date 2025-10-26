@@ -48,13 +48,14 @@ class Profile(models.Model):
     projects = models.ManyToManyField(Project, blank=True)
     education = models.ManyToManyField(Education, blank=True)
     work_experience = models.ManyToManyField(WorkExperience, blank=True)
+    
     PRIVACY_PUBLIC = "public"
     PRIVACY_RECRUITERS = "recruiters"
     PRIVACY_PRIVATE = "private"
     PRIVACY_CHOICES = [
         (PRIVACY_PUBLIC, "Public (anyone can view)"),
         (PRIVACY_RECRUITERS, "Recruiters only"),
-        (PRIVACY_PRIVATE, "Private (only me)"),
+
     ]
 
     privacy_level = models.CharField(
