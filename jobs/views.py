@@ -115,6 +115,10 @@ def edit_job(request, job_id):
         job.skills = request.POST.get('skills')
         job.salary = request.POST.get('salary') or None
         job.location = request.POST.get('location')
+        lat = request.POST.get('latitude')
+        lon = request.POST.get('longitude')
+        job.latitude = lat or None
+        job.longitude = lon or None
         job.remote_or_on_site = request.POST.get('remote_or_on_site')
         job.visa_sponsorship = request.POST.get('visa_sponsorship')
         job.save()
@@ -237,25 +241,6 @@ def jobs_geo_api(request):
         },
     } for j in jobs]
     return JsonResponse({"type": "FeatureCollection", "features": features})
-
-
-def create_job(request):
-    if request.method == 'POST':
-        job = Job()
-        job.title = request.POST.get('title')
-        job.skills = request.POST.get('skills')
-        job.salary = request.POST.get('salary') or None
-        job.location = request.POST.get('location') or ''
-        lat = request.POST.get('latitude')
-        lon = request.POST.get('longitude')
-        job.latitude = lat or None
-        job.longitude = lon or None
-        job.remote_or_on_site = request.POST.get('remote_or_on_site')
-        job.visa_sponsorship = request.POST.get('visa_sponsorship')
-        job.posted_by = request.user
-        job.save()
-        messages.success(request, 'Job posted successfully!')
-        return redirect('jobs.index')
 
 
 @login_required
