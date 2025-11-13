@@ -1,7 +1,59 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container py-4">
-  <h2 class="mb-4">Search Candidates</h2>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Search Candidates</h2>
+    {% if user.is_authenticated and user.role == 'recruiter' %}
+      <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-success" id="toggleSaveFormBtn">
+          <i class="fas fa-bookmark me-1"></i>Save Search
+        </button>
+        <a href="{% url 'accounts.saved_searches' %}" class="btn btn-outline-primary">
+          <i class="fas fa-bookmark me-1"></i>Saved Searches
+        </a>
+      </div>
+    {% endif %}
+  </div>
+  
+  {% if user.is_authenticated and user.role == 'recruiter' %}
+    <!-- Inline Save Search Form -->
+    <div class="card mb-4" id="saveSearchFormContainer" style="display: none;">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+          <i class="fas fa-bookmark me-2"></i>Save This Search
+        </h5>
+        <button type="button" class="btn-close btn-close-white" id="closeSaveFormBtn" aria-label="Close"></button>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{% url 'accounts.save_search' %}" id="saveSearchForm">
+          {% csrf_token %}
+          <p class="text-muted mb-3">Save your current search criteria to get notified about new matching candidates.</p>
+          <div class="row">
+            <div class="col-md-8">
+              <div class="mb-3">
+                <label for="search_name" class="form-label fw-bold">Search Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="search_name" name="name" required 
+                       placeholder="e.g., Python Developers in NYC" autofocus>
+                <div class="form-text">Give this search a memorable name so you can find it later</div>
+              </div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="d-grid gap-2 w-100">
+                <button type="submit" class="btn btn-primary">
+                  <i class="fas fa-save me-1"></i>Save Search
+                </button>
+                <button type="button" class="btn btn-secondary" id="cancelSaveFormBtn">
+                  <i class="fas fa-times me-1"></i>Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- Hidden fields will be populated by JavaScript -->
+          <div id="hiddenFieldsContainer"></div>
+        </form>
+      </div>
+    </div>
+  {% endif %}
   
   <div class="row g-4">
     <div class="col-md-4">
@@ -184,5 +236,137 @@
   .badge {
     font-size: 0.75em;
   }
+  
+  /* Save Search Form Styles */
+  #saveSearchFormContainer {
+    animation: slideDown 0.3s ease-out;
+  }
+  
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  #saveSearchFormContainer .card-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  }
 </style>
+
+{% if user.is_authenticated and user.role == 'recruiter' %}
+<script>
+  (function() {
+    'use strict';
+    
+    const formContainer = document.getElementById('saveSearchFormContainer');
+    const toggleBtn = document.getElementById('toggleSaveFormBtn');
+    const closeBtn = document.getElementById('closeSaveFormBtn');
+    const cancelBtn = document.getElementById('cancelSaveFormBtn');
+    const saveForm = document.getElementById('saveSearchForm');
+    
+    if (!formContainer || !toggleBtn) return;
+    
+    // Toggle form visibility
+    function showForm() {
+      formContainer.style.display = 'block';
+      populateHiddenFields();
+      // Focus on input after a short delay
+      setTimeout(function() {
+        const nameInput = document.getElementById('search_name');
+        if (nameInput) nameInput.focus();
+      }, 100);
+    }
+    
+    function hideForm() {
+      formContainer.style.display = 'none';
+      // Clear the form
+      if (saveForm) {
+        saveForm.reset();
+        const container = document.getElementById('hiddenFieldsContainer');
+        if (container) container.innerHTML = '';
+      }
+    }
+    
+    // Event listeners
+    toggleBtn.addEventListener('click', showForm);
+    if (closeBtn) closeBtn.addEventListener('click', hideForm);
+    if (cancelBtn) cancelBtn.addEventListener('click', hideForm);
+    
+    // Populate hidden fields with current search criteria
+    function populateHiddenFields() {
+      const container = document.getElementById('hiddenFieldsContainer');
+      if (!container) return;
+      
+      container.innerHTML = '';
+      
+      // Get search form
+      const searchForm = document.querySelector('form[method="get"]');
+      const urlParams = new URLSearchParams(window.location.search);
+      
+      // Helper to get value from form or URL
+      function getValue(fieldName) {
+        if (searchForm) {
+          const input = searchForm.querySelector('[name="' + fieldName + '"]');
+          if (input) {
+            if (input.type === 'checkbox') {
+              return input.checked ? 'on' : '';
+            }
+            return input.value || '';
+          }
+        }
+        return urlParams.get(fieldName) || '';
+      }
+      
+      // Helper to add hidden input
+      function addHidden(name, value) {
+        if (value) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = value;
+          container.appendChild(input);
+        }
+      }
+      
+      // Add location
+      addHidden('location', getValue('location'));
+      
+      // Add project keyword
+      addHidden('project_keyword', getValue('project_keyword'));
+      
+      // Add match_all_skills
+      const matchAll = getValue('match_all_skills');
+      if (matchAll === 'on') {
+        addHidden('match_all_skills', 'on');
+      }
+      
+      // Add skills
+      const skillIds = new Set();
+      
+      // From form checkboxes
+      if (searchForm) {
+        const checkedSkills = searchForm.querySelectorAll('input[name="skills"]:checked');
+        checkedSkills.forEach(function(input) {
+          skillIds.add(input.value);
+        });
+      }
+      
+      // From URL params
+      urlParams.getAll('skills').forEach(function(id) {
+        skillIds.add(id);
+      });
+      
+      // Add all skills
+      skillIds.forEach(function(id) {
+        addHidden('skills', id);
+      });
+    }
+  })();
+</script>
+{% endif %}
 {% endblock %}

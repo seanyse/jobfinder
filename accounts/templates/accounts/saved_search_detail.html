@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2>{{ saved_search.name }}</h2>
+      <div class="mb-2">
+        {% if saved_search.is_active %}
+          <span class="badge bg-success">Active</span>
+        {% else %}
+          <span class="badge bg-secondary">Inactive</span>
+        {% endif %}
+        {% if saved_search.location %}
+          <span class="badge bg-info me-1">
+            <i class="fas fa-map-marker-alt me-1"></i>{{ saved_search.location }}
+          </span>
+        {% endif %}
+        {% if saved_search.project_keyword %}
+          <span class="badge bg-info me-1">
+            <i class="fas fa-code me-1"></i>{{ saved_search.project_keyword }}
+          </span>
+        {% endif %}
+        {% if saved_search.skills.all %}
+          <span class="badge bg-info me-1">
+            <i class="fas fa-tags me-1"></i>
+            {% for skill in saved_search.skills.all|slice:":3" %}
+              {{ skill.name }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+            {% if saved_search.skills.count > 3 %}
+              +{{ saved_search.skills.count|add:"-3" }} more
+            {% endif %}
+          </span>
+        {% endif %}
+        <span class="badge bg-secondary me-1">
+          {% if saved_search.match_all_skills %}All skills (AND){% else %}Any skill (OR){% endif %}
+        </span>
+      </div>
+      <p class="text-muted mb-0">
+        <small>
+          Created: {{ saved_search.created_at|date:"M d, Y" }}
+          {% if saved_search.last_checked %}
+            | Last checked: {{ saved_search.last_checked|date:"M d, Y" }}
+          {% endif %}
+        </small>
+      </p>
+    </div>
+    <div>
+      <a href="{% url 'accounts.saved_searches' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i>Back to Saved Searches
+      </a>
+    </div>
+  </div>
+  
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Search Results</span>
+      <div>
+        <span class="badge bg-primary">{{ results|length }} candidate{{ results|length|pluralize }}</span>
+        {% if saved_search.is_active and notified_count > 0 %}
+          <span class="badge bg-secondary">{{ notified_count }} notified</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card-body">
+      {% if results %}
+        <div class="row g-3">
+          {% for p in results %}
+            <div class="col-12">
+              <div class="card border {% if p.is_new_match %}border-warning{% endif %}">
+                <div class="card-body">
+                  <div class="row align-items-center">
+                    <div class="col-md-2 text-center">
+                      {% if p.profile_picture %}
+                        <img src="{{ p.profile_picture.url }}" class="img-fluid rounded-circle" style="width: 60px; height: 60px; object-fit: cover;" alt="Profile picture" />
+                      {% else %}
+                        <div class="bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                          <i class="fas fa-user text-muted"></i>
+                        </div>
+                      {% endif %}
+                    </div>
+                    <div class="col-md-8">
+                      <h6 class="mb-1">
+                        <a href="{% url 'accounts.profile_detail' username=p.user.username %}" class="text-decoration-none">
+                          {{ p.user.username }}
+                        </a>
+                        {% if p.is_new_match %}
+                          <span class="badge bg-warning ms-2">New Match</span>
+                        {% endif %}
+                      </h6>
+                      <p class="mb-1 text-muted">{{ p.headline }}</p>
+                      <p class="mb-1">
+                        <i class="fas fa-map-marker-alt me-1"></i>{{ p.location|default:"Location not specified" }}
+                      </p>
+                      <div class="mb-2">
+                        {% for skill in p.skills.all|slice:":5" %}
+                          <span class="badge bg-secondary me-1">{{ skill.name }}</span>
+                        {% endfor %}
+                        {% if p.skills.count > 5 %}
+                          <span class="text-muted">+{{ p.skills.count|add:"-5" }} more</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="col-md-2 text-end">
+                      {% if p.matched %}
+                        <span class="badge bg-success">{{ p.matched }} skill{{ p.matched|pluralize }} match</span>
+                      {% endif %}
+                      <div class="mt-2">
+                        <a href="{% url 'accounts.profile_detail' username=p.user.username %}" class="btn btn-sm btn-outline-primary">
+                          View Profile
+                        </a>
+                        <a href="{% url 'accounts.start_conversation' p.user.id %}" class="btn btn-sm btn-primary">
+                          Message
+                        </a>
+                        {% if p.user.email %}
+                          <a href="mailto:{{ p.user.email }}" class="btn btn-sm btn-success mt-1 d-block">
+                            <i class="fas fa-envelope me-1"></i>Email
+                          </a>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-center py-5">
+          <i class="fas fa-search fa-3x text-muted mb-3"></i>
+          <h5 class="text-muted">No candidates found</h5>
+          <p class="text-muted">No candidates match this search criteria at the moment.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

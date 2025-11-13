@@ -1,7 +1,7 @@
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from .models import CustomUser
 from django import forms
-from .models import Profile, Skill, Project, Education, WorkExperience, Conversation, Message
+from .models import Profile, Skill, Project, Education, WorkExperience, Conversation, Message, SavedCandidateSearch
 from django.forms import formset_factory, modelformset_factory, TextInput, URLInput, Textarea, Select
 
 class CustomUserCreationForm(UserCreationForm):
@@ -121,3 +121,15 @@ class MessageForm(forms.ModelForm):
                 'placeholder': 'Type your message here...'
             })
         }
+
+class SaveSearchForm(forms.Form):
+    """Form for saving a candidate search"""
+    name = forms.CharField(
+        max_length=200,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., Python Developers in NYC'
+        }),
+        help_text="Give this search a memorable name"
+    )

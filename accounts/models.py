@@ -102,3 +102,35 @@ class Message(models.Model):
     
     def __str__(self):
         return f"{self.sender.username}: {self.content[:50]}..."
+
+class SavedCandidateSearch(models.Model):
+    """Represents a saved candidate search by a recruiter"""
+    recruiter = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='saved_searches')
+    name = models.CharField(max_length=200, help_text="A name for this search (e.g., 'Python Developers in NYC')")
+    location = models.CharField(max_length=120, blank=True)
+    project_keyword = models.CharField(max_length=200, blank=True)
+    skills = models.ManyToManyField(Skill, blank=True)
+    match_all_skills = models.BooleanField(default=True, help_text="If True, candidates must have all selected skills (AND). If False, any selected skill (OR).")
+    is_active = models.BooleanField(default=True, help_text="If active, recruiter will be notified of new matches")
+    last_checked = models.DateTimeField(null=True, blank=True, help_text="When we last checked for new matches")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.recruiter.username}: {self.name}"
+
+class SearchMatchNotification(models.Model):
+    """Tracks which candidates have been notified for which saved search"""
+    saved_search = models.ForeignKey(SavedCandidateSearch, on_delete=models.CASCADE, related_name='notifications')
+    candidate = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='search_match_notifications')
+    notified_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('saved_search', 'candidate')
+        ordering = ['-notified_at']
+    
+    def __str__(self):
+        return f"Notification: {self.saved_search.name} → {self.candidate.username}"
