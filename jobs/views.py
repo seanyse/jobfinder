@@ -110,8 +110,6 @@ def index(request):
         'other_jobs': other_jobs,
         'filter_applied': filter_applied,
     }
-    print(recommended_jobs)
-    print(other_jobs)
     return render(request, 'jobs/job_listings.html', {'template_data': template_data})
 
 
