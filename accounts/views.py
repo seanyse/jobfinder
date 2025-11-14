@@ -3,7 +3,7 @@ from django.contrib.auth import login as auth_login, authenticate, logout as aut
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, MessageForm
-from .models import Profile, Education, WorkExperience, Conversation, Message, CustomUser
+from .models import Profile, Education, WorkExperience, Conversation, Message, CustomUser, Project
 from django.db.models import Q, Count, Value
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
