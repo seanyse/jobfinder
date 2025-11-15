@@ -55,9 +55,9 @@
           <span class="badge bg-primary">{{ results|length|add:users_without_profiles|length }} candidate{{ results|length|add:users_without_profiles|length|pluralize }}</span>
         </div>
         <div class="card-body">
-          {% if results or users_without_profiles or matches %}
+          {% if results or users_without_profiles%}
             <div class="row g-3">
-              {% if matches %}
+              {% if has_matches %}
                 <div class="col-md-12 mt-4">
                   <div class="card border border-warning border-3">
                     <div class="card-header bg-warning text-dark fw-bold">

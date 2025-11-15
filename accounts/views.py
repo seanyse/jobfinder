@@ -310,7 +310,6 @@ def candidate_search(request):
         )
     
     results = qs.distinct()
-
     
     # candidate recommedation functionality
     matches = {}   # job → list of matching profiles
@@ -337,7 +336,10 @@ def candidate_search(request):
                 if overlap >= 2:
                     matches[job].append(profile)
 
-    return render(request, "accounts/candidate_search.html", {"form": form, "results": results, "users_without_profiles": users_without_profiles, "matches": matches})
+    recommended_ids = [p.id for profiles in matches.values() for p in profiles]
+    results = results.exclude(id__in=recommended_ids)
+    has_matches = any(matches.values()) # bool that returns true if there are any candidate recommendations
+    return render(request, "accounts/candidate_search.html", {"form": form, "results": results, "users_without_profiles": users_without_profiles, "matches": matches, "has_matches": has_matches})
 
 def update_commute_radius(request):
     """API endpoint to update user's preferred commute radius"""

@@ -19,7 +19,6 @@ def index(request):
     filter_applied = 0
 
     if request.user.role == 'seeker':
-        user_profile = Profile.objects.get(user=request.user)
         # Apply filters for job seekers
         title = request.GET.get('title', '').strip()
         skills = request.GET.get('skills', '').strip()
@@ -57,37 +56,45 @@ def index(request):
             user=request.user
         ).values_list('job_id', flat=True)
 
-        user_skills = {s.name.lower().strip() for s in user_profile.skills.all()}
-
-        used_filters = any([
-            title,
-            skills,
-            location,
-            min_salary,
-            max_salary,
-            remote_or_on_site,
-            visa_sponsorship,
-        ])
+        # Job Recommendation functionality
         recommended_jobs = []
         other_jobs = []
-        if used_filters:
-            filter_applied = 1
+        # check if user created a profile
+        try:
+            user_profile = Profile.objects.get(user=request.user)
+        except Profile.DoesNotExist:
             other_jobs = list(jobs)
         else:
-            for job in jobs:
-                # Convert job's text field into a set of lowercase skills
-                job_skill_names = {
-                    s.lower().strip()
-                    for s in job.skills.split(",")
-                    if s.strip() != ""
-                }
+            user_skills = {s.name.lower().strip() for s in user_profile.skills.all()}
 
-                overlap = len(user_skills & job_skill_names)
+            used_filters = any([
+                title,
+                skills,
+                location,
+                min_salary,
+                max_salary,
+                remote_or_on_site,
+                visa_sponsorship,
+            ])
+            
+            # if a filter is used then do not apply the recommendation job functionality
+            if used_filters:
+                filter_applied = 1
+                other_jobs = list(jobs)
+            else:
+                for job in jobs:
+                    job_skill_names = {
+                        s.lower().strip()
+                        for s in job.skills.split(",")
+                        if s.strip() != ""
+                    }
 
-                if overlap >= 2:
-                    recommended_jobs.append(job)
-                else:
-                    other_jobs.append(job)
+                    overlap = len(user_skills & job_skill_names)
+
+                    if overlap >= 2:
+                        recommended_jobs.append(job)
+                    else:
+                        other_jobs.append(job)
 
     elif request.user.role == 'recruiter':
         jobs = jobs.annotate(

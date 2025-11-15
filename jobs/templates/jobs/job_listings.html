@@ -163,9 +163,11 @@
                 </div>
             </div>
         {% endfor %}
-        <h2>Other Jobs</h2>
     {% endif %}
     {% if template_data.other_jobs %}
+        {% if template_data.recommended_jobs %}
+            <h2>Other Jobs</h2>
+        {% endif %}
         {% for job in template_data.other_jobs %}
             <div class="card mb-2 p-3">
                 <div class="row">
@@ -210,7 +212,8 @@
                 </div>
             </div>
         {% endfor %}
-    {% else %}
+    {% endif %}
+    {% if not template_data.other_jobs and not template_data.recommended_jobs %}
         <div class="text-center mt-5">
             {% if template_data.filter_applied %}
                 <h3>No job postings matched your filters.</h3>
