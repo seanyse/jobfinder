@@ -1,5 +1,10 @@
 {% extends 'base.html' %}
 {% block content %}
+
+<!-- Leaflet CSS and JS for map functionality -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
 <h1>Edit Job</h1>
 
 <form method="POST">
@@ -22,7 +27,24 @@
 
     <p>
         <label for="location">Location (optional):</label>
-        <input type="text" name="location" id="location" class="form-control" value="{{ template_data.job.location }}">
+        <input type="text" name="location" id="location" class="form-control" value="{{ template_data.job.location }}" placeholder="e.g., Atlanta, GA">
+    </p>
+
+    <p>
+        <label>Pin Office Location on Map:</label>
+        <small class="text-muted d-block mb-2">Click on the map to set or update the exact office location</small>
+        <div id="job-location-map" style="height: 400px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 10px;"></div>
+        <div class="row">
+            <div class="col-md-6">
+                <label for="latitude">Latitude:</label>
+                <input type="number" name="latitude" step="0.000001" class="form-control" id="latitude" value="{% if template_data.job.latitude %}{{ template_data.job.latitude }}{% endif %}" readonly>
+            </div>
+            <div class="col-md-6">
+                <label for="longitude">Longitude:</label>
+                <input type="number" name="longitude" step="0.000001" class="form-control" id="longitude" value="{% if template_data.job.longitude %}{{ template_data.job.longitude }}{% endif %}" readonly>
+            </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="clear-location">Clear Location</button>
     </p>
 
     <p>
@@ -47,4 +69,83 @@
         <a href="{% url 'jobs.index' %}" class="btn btn-secondary">Cancel</a>
     </div>
 </form>
+
+<script>
+// Initialize map for job location pinning
+let jobLocationMap, locationMarker;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const latInput = document.getElementById('latitude');
+    const lngInput = document.getElementById('longitude');
+    
+    // Get existing coordinates or use default (Atlanta, GA)
+    let initialLat = parseFloat(latInput.value) || 33.7756;
+    let initialLng = parseFloat(lngInput.value) || -84.3963;
+    let initialZoom = latInput.value && lngInput.value ? 15 : 10;
+    
+    // Initialize map
+    jobLocationMap = L.map('job-location-map').setView([initialLat, initialLng], initialZoom);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 20,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(jobLocationMap);
+    
+    // If there's an existing location, add a marker
+    if (latInput.value && lngInput.value) {
+        locationMarker = L.marker([initialLat, initialLng], {
+            draggable: true,
+            title: 'Office Location'
+        }).addTo(jobLocationMap)
+          .bindPopup('Office Location<br>Drag to adjust').openPopup();
+        
+        // Update coordinates when marker is dragged
+        locationMarker.on('dragend', function(e) {
+            const pos = locationMarker.getLatLng();
+            latInput.value = pos.lat.toFixed(6);
+            lngInput.value = pos.lng.toFixed(6);
+        });
+    }
+    
+    // Add click handler to pin location
+    jobLocationMap.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        
+        // Update input fields
+        latInput.value = lat.toFixed(6);
+        lngInput.value = lng.toFixed(6);
+        
+        // Remove existing marker if any
+        if (locationMarker) {
+            jobLocationMap.removeLayer(locationMarker);
+        }
+        
+        // Add new marker
+        locationMarker = L.marker([lat, lng], {
+            draggable: true,
+            title: 'Office Location'
+        }).addTo(jobLocationMap)
+          .bindPopup('Office Location<br>Drag to adjust').openPopup();
+        
+        // Update coordinates when marker is dragged
+        locationMarker.on('dragend', function(e) {
+            const pos = locationMarker.getLatLng();
+            latInput.value = pos.lat.toFixed(6);
+            lngInput.value = pos.lng.toFixed(6);
+        });
+    });
+    
+    // Clear location button
+    document.getElementById('clear-location').addEventListener('click', function() {
+        if (locationMarker) {
+            jobLocationMap.removeLayer(locationMarker);
+            locationMarker = null;
+        }
+        latInput.value = '';
+        lngInput.value = '';
+    });
+});
+</script>
+
 {% endblock content %}
