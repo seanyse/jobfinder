@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Case, When, IntegerField
 from .models import Job, Application, SavedJob
+from accounts.models import Profile
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
@@ -13,6 +14,9 @@ def is_seeker(user):
 def index(request):
     jobs = Job.objects.all()
     filters = {}
+    user_applications = []
+    user_saved_jobs = []
+    filter_applied = 0
 
     if request.user.role == 'seeker':
         # Apply filters for job seekers
@@ -42,15 +46,57 @@ def index(request):
             jobs = jobs.filter(visa_sponsorship=visa_sponsorship)
 
         filters = request.GET
-        
-        # Get user's applications to show which jobs they've already applied to
-        user_applications = Application.objects.filter(applicant=request.user).values_list('job_id', flat=True)
-        
-        # Get user's saved jobs
-        user_saved_jobs = SavedJob.objects.filter(user=request.user).values_list('job_id', flat=True)
+
+        # Applications + saved
+        user_applications = Application.objects.filter(
+            applicant=request.user
+        ).values_list('job_id', flat=True)
+
+        user_saved_jobs = SavedJob.objects.filter(
+            user=request.user
+        ).values_list('job_id', flat=True)
+
+        # Job Recommendation functionality
+        recommended_jobs = []
+        other_jobs = []
+        # check if user created a profile
+        try:
+            user_profile = Profile.objects.get(user=request.user)
+        except Profile.DoesNotExist:
+            other_jobs = list(jobs)
+        else:
+            user_skills = {s.name.lower().strip() for s in user_profile.skills.all()}
+
+            used_filters = any([
+                title,
+                skills,
+                location,
+                min_salary,
+                max_salary,
+                remote_or_on_site,
+                visa_sponsorship,
+            ])
+            
+            # if a filter is used then do not apply the recommendation job functionality
+            if used_filters:
+                filter_applied = 1
+                other_jobs = list(jobs)
+            else:
+                for job in jobs:
+                    job_skill_names = {
+                        s.lower().strip()
+                        for s in job.skills.split(",")
+                        if s.strip() != ""
+                    }
+
+                    overlap = len(user_skills & job_skill_names)
+
+                    if overlap >= 2:
+                        recommended_jobs.append(job)
+                    else:
+                        other_jobs.append(job)
 
     elif request.user.role == 'recruiter':
-        # For recruiters, sort their jobs on top
         jobs = jobs.annotate(
             is_mine=Case(
                 When(posted_by=request.user, then=0),
@@ -58,18 +104,21 @@ def index(request):
                 output_field=IntegerField()
             )
         ).order_by('is_mine', '-created_at')
-        user_applications = []
-        user_saved_jobs = []
+
+        recommended_jobs = []
+        other_jobs = list(jobs)
 
     template_data = {
         'title': 'Jobs',
-        'jobs': jobs,
         'filters': filters,
         'user_applications': user_applications,
-        'user_saved_jobs': user_saved_jobs if request.user.is_authenticated and request.user.role == 'seeker' else [],
+        'user_saved_jobs': user_saved_jobs,
+        'recommended_jobs': recommended_jobs,
+        'other_jobs': other_jobs,
+        'filter_applied': filter_applied,
     }
-
     return render(request, 'jobs/job_listings.html', {'template_data': template_data})
+
 
 def is_recruiter(user):
     return user.is_authenticated and user.role == 'recruiter'
