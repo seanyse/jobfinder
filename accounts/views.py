@@ -2,13 +2,18 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login as auth_login, authenticate, logout as auth_logout, get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, MessageForm, ContactCandidateForm, SaveSearchForm
+from .models import Profile, Education, WorkExperience, Conversation, Message, CustomUser, Project, SavedCandidateSearch, SearchMatchNotification
 from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, MessageForm
 from .models import Profile, Education, WorkExperience, Conversation, Message, CustomUser, Project
 from jobs.models import Job
 from django.db.models import Q, Count, Value
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django.core.mail import EmailMessage, get_connection
+from django.conf import settings
+from django.utils import timezone
 import json
 
 
@@ -340,6 +345,197 @@ def candidate_search(request):
     results = results.exclude(id__in=recommended_ids)
     has_matches = any(matches.values()) # bool that returns true if there are any candidate recommendations
     return render(request, "accounts/candidate_search.html", {"form": form, "results": results, "users_without_profiles": users_without_profiles, "matches": matches, "has_matches": has_matches})
+
+def _execute_saved_search_query(saved_search):
+    """
+    Helper function to execute a saved search query and return matching profiles.
+    This replicates the logic from candidate_search view.
+    """
+    User = get_user_model()
+    seeker_users = User.objects.filter(role='seeker')
+    
+    # Get profiles for these users with public privacy level
+    qs = Profile.objects.filter(
+        user__in=seeker_users,
+        privacy_level=Profile.PRIVACY_PUBLIC
+    ).select_related("user").prefetch_related("skills", "projects")
+    
+    # Apply location filter
+    if saved_search.location:
+        qs = qs.filter(location__icontains=saved_search.location)
+    
+    # Apply project keyword filter
+    if saved_search.project_keyword:
+        qs = qs.filter(Q(projects__title__icontains=saved_search.project_keyword) | 
+                      Q(projects__description__icontains=saved_search.project_keyword))
+    
+    # Apply skills filter
+    sel_skills = list(saved_search.skills.all())
+    if sel_skills:
+        if saved_search.match_all_skills:
+            for s in sel_skills:
+                qs = qs.filter(skills=s)  # AND
+            qs = qs.annotate(matched=Value(len(sel_skills)))
+        else:
+            qs = qs.filter(skills__in=sel_skills)  # OR
+            qs = qs.annotate(
+                matched=Count("skills", filter=Q(skills__in=sel_skills), distinct=True)
+            )
+        qs = qs.order_by("-matched", "user__username")
+    else:
+        qs = qs.order_by("user__username")
+    
+    return qs.distinct()
+
+@login_required
+def save_candidate_search(request):
+    """Save the current candidate search with a name"""
+    if request.user.role != 'recruiter':
+        messages.error(request, 'Only recruiters can save searches.')
+        return redirect('accounts.candidate_search')
+    
+    if request.method == 'POST':
+        save_form = SaveSearchForm(request.POST)
+        # Get search parameters from POST (they'll be included as hidden fields)
+        search_data = {
+            'location': request.POST.get('location', ''),
+            'project_keyword': request.POST.get('project_keyword', ''),
+            'skills': request.POST.getlist('skills'),
+            'match_all_skills': request.POST.get('match_all_skills') == 'on'
+        }
+        search_form = CandidateSearchForm(search_data)
+        
+        if save_form.is_valid() and search_form.is_valid():
+            name = save_form.cleaned_data['name']
+            
+            # Check if a search with this name already exists for this user
+            existing = SavedCandidateSearch.objects.filter(
+                recruiter=request.user,
+                name=name
+            ).first()
+            
+            if existing:
+                messages.error(request, f'A search named "{name}" already exists. Please choose a different name.')
+                # Redirect back with search parameters
+                params = request.POST.urlencode() if hasattr(request.POST, 'urlencode') else ''
+                return redirect('accounts.candidate_search?' + params)
+            
+            # Create the saved search
+            saved_search = SavedCandidateSearch.objects.create(
+                recruiter=request.user,
+                name=name,
+                location=search_form.cleaned_data.get('location', ''),
+                project_keyword=search_form.cleaned_data.get('project_keyword', ''),
+                match_all_skills=search_form.cleaned_data.get('match_all_skills', True)
+            )
+            
+            # Add skills
+            skills = search_form.cleaned_data.get('skills', [])
+            if skills:
+                saved_search.skills.set(skills)
+            
+            messages.success(request, f'Search "{name}" saved successfully!')
+            return redirect('accounts.saved_searches')
+        else:
+            messages.error(request, 'Please provide a name for this search.')
+            # Redirect back with original GET parameters if available
+            if request.GET:
+                return redirect('accounts.candidate_search?' + request.GET.urlencode())
+            return redirect('accounts.candidate_search')
+    
+    return redirect('accounts.candidate_search')
+
+@login_required
+def saved_searches_list(request):
+    """List all saved searches for the current recruiter"""
+    if request.user.role != 'recruiter':
+        messages.error(request, 'Only recruiters can view saved searches.')
+        return redirect('home.index')
+    
+    saved_searches = SavedCandidateSearch.objects.filter(
+        recruiter=request.user
+    ).prefetch_related('skills').order_by('-created_at')
+    
+    # For each saved search, count current matches
+    for search in saved_searches:
+        matches = _execute_saved_search_query(search)
+        search.match_count = matches.count()
+        # Count new matches (candidates not yet notified)
+        if search.is_active:
+            notified_candidate_ids = SearchMatchNotification.objects.filter(
+                saved_search=search
+            ).values_list('candidate_id', flat=True)
+            new_matches = matches.exclude(user_id__in=notified_candidate_ids)
+            search.new_match_count = new_matches.count()
+        else:
+            search.new_match_count = 0
+    
+    return render(request, 'accounts/saved_searches.html', {
+        'saved_searches': saved_searches
+    })
+
+@login_required
+def saved_search_detail(request, search_id):
+    """View matches for a specific saved search"""
+    saved_search = get_object_or_404(
+        SavedCandidateSearch,
+        id=search_id,
+        recruiter=request.user
+    )
+    
+    results = _execute_saved_search_query(saved_search)
+    
+    # Get list of already notified candidates
+    notified_candidate_ids = SearchMatchNotification.objects.filter(
+        saved_search=saved_search
+    ).values_list('candidate_id', flat=True)
+    
+    # Mark which candidates are new (not yet notified)
+    for result in results:
+        result.is_new_match = (
+            saved_search.is_active and 
+            result.user_id not in notified_candidate_ids
+        )
+    
+    return render(request, 'accounts/saved_search_detail.html', {
+        'saved_search': saved_search,
+        'results': results,
+        'notified_count': len(notified_candidate_ids)
+    })
+
+@login_required
+def delete_saved_search(request, search_id):
+    """Delete a saved search"""
+    saved_search = get_object_or_404(
+        SavedCandidateSearch,
+        id=search_id,
+        recruiter=request.user
+    )
+    
+    if request.method == 'POST':
+        name = saved_search.name
+        saved_search.delete()
+        messages.success(request, f'Search "{name}" deleted successfully.')
+        return redirect('accounts.saved_searches')
+    
+    return redirect('accounts.saved_searches')
+
+@login_required
+def toggle_saved_search_active(request, search_id):
+    """Toggle the active status of a saved search"""
+    saved_search = get_object_or_404(
+        SavedCandidateSearch,
+        id=search_id,
+        recruiter=request.user
+    )
+    
+    if request.method == 'POST':
+        saved_search.is_active = not saved_search.is_active
+        saved_search.save()
+        status = 'activated' if saved_search.is_active else 'deactivated'
+        messages.success(request, f'Search "{saved_search.name}" {status}.')
+    
+    return redirect('accounts.saved_searches')
 
 def update_commute_radius(request):
     """API endpoint to update user's preferred commute radius"""
