@@ -1,5 +1,12 @@
 {% extends 'base.html' %}
 {% block content %}
+
+<!-- Leaflet CSS and JS for map functionality -->
+{% if template_data.job.latitude and template_data.job.longitude %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+{% endif %}
+
 <div class="container mt-4">
     <div class="row">
         <!-- Job Details Card -->
@@ -51,6 +58,14 @@
                             {% endfor %}
                         </div>
                     </div>
+                    
+                    {% if template_data.job.latitude and template_data.job.longitude %}
+                    <div class="mb-4">
+                        <h5>Office Location:</h5>
+                        <div id="job-detail-map" style="height: 300px; border-radius: 8px; border: 1px solid #ddd;"></div>
+                        <small class="text-muted">Exact location of the office</small>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -222,4 +237,29 @@
     color: white;
 }
 </style>
+
+{% if template_data.job.latitude and template_data.job.longitude %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lat = {{ template_data.job.latitude }};
+    const lng = {{ template_data.job.longitude }};
+    
+    // Initialize map
+    const map = L.map('job-detail-map').setView([lat, lng], 15);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 20,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    
+    // Add marker for office location
+    L.marker([lat, lng], {
+        title: 'Office Location'
+    }).addTo(map)
+      .bindPopup('<b>{{ template_data.job.title }}</b><br>{{ template_data.job.location|default:"Office Location" }}')
+      .openPopup();
+});
+</script>
+{% endif %}
+
 {% endblock content %}

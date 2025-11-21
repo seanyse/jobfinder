@@ -4,6 +4,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, MessageForm, ContactCandidateForm, SaveSearchForm
 from .models import Profile, Education, WorkExperience, Conversation, Message, CustomUser, Project, SavedCandidateSearch, SearchMatchNotification
+from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, MessageForm
+from .models import Profile, Education, WorkExperience, Conversation, Message, CustomUser, Project
+from jobs.models import Job
 from django.db.models import Q, Count, Value
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
@@ -265,7 +268,7 @@ def candidate_search(request):
     # US-11: recruiter searches candidates
     form = CandidateSearchForm(request.GET or None)
     results = None
-    
+    filters_applied = False
     # Start with all job seekers (users with role='seeker')
     User = get_user_model()
     seeker_users = User.objects.filter(role='seeker')
@@ -305,10 +308,43 @@ def candidate_search(request):
         else:
             # Order by username when no skills selected
             qs = qs.order_by("user__username")
+        filters_applied = bool(
+            form.cleaned_data.get("location") or
+            form.cleaned_data.get("project_keyword") or
+            (form.cleaned_data.get("skills") and len(form.cleaned_data.get("skills")) > 0)
+        )
     
     results = qs.distinct()
+    
+    # candidate recommedation functionality
+    matches = {}   # job → list of matching profiles
+    if not filters_applied:
+        for job in Job.objects.filter(posted_by=request.user):
+            # convert job skills text field into a lowercase set
+            job_skill_set = {
+                s.lower().strip()
+                for s in job.skills.split(",")
+                if s.strip() != ""
+            }
 
-    return render(request, "accounts/candidate_search.html", {"form": form, "results": results, "users_without_profiles": users_without_profiles})
+            matches[job] = []  # initialize list for this job
+
+            # Loop through every candidate profile you already iterated earlier
+            for profile in qs:   # <-- use your existing qs from above
+                candidate_skill_set = {
+                    s.name.lower().strip()
+                    for s in profile.skills.all()
+                }
+
+                overlap = len(job_skill_set & candidate_skill_set)
+
+                if overlap >= 2:
+                    matches[job].append(profile)
+
+    recommended_ids = [p.id for profiles in matches.values() for p in profiles]
+    results = results.exclude(id__in=recommended_ids)
+    has_matches = any(matches.values()) # bool that returns true if there are any candidate recommendations
+    return render(request, "accounts/candidate_search.html", {"form": form, "results": results, "users_without_profiles": users_without_profiles, "matches": matches, "has_matches": has_matches})
 
 def _execute_saved_search_query(saved_search):
     """

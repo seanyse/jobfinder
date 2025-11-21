@@ -107,8 +107,101 @@
           <span class="badge bg-primary">{{ results|length|add:users_without_profiles|length }} candidate{{ results|length|add:users_without_profiles|length|pluralize }}</span>
         </div>
         <div class="card-body">
-          {% if results or users_without_profiles %}
+          {% if results or users_without_profiles%}
             <div class="row g-3">
+              {% if has_matches %}
+                <div class="col-md-12 mt-4">
+                  <div class="card border border-warning border-3">
+                    <div class="card-header bg-warning text-dark fw-bold">
+                      Matched Candidates by Job
+                    </div>
+                    <div class="card-body">
+
+                      {% for job, profiles in matches.items %}
+                        {% if profiles %}
+                          <div class="mb-4 p-3 border rounded">
+
+                          <!-- Job Title -->
+                          <h5 class="fw-bold">{{ job.title }}</h5>
+
+              
+
+                          <!-- Matched Profiles -->
+                          {% if profiles %}
+                            <div class="row g-3 mt-3">
+
+                              {% for p in profiles %}
+                                <div class="col-12">
+                                  <div class="card border border-success">
+                                    <div class="card-body">
+                                      <div class="row align-items-center">
+
+                                        <!-- Picture -->
+                                        <div class="col-md-2 text-center">
+                                          {% if p.profile_picture %}
+                                            <img src="{{ p.profile_picture.url }}" class="img-fluid rounded-circle"
+                                                style="width: 60px; height: 60px; object-fit: cover;" />
+                                          {% else %}
+                                            <div class="bg-light rounded-circle d-flex align-items-center justify-content-center"
+                                                style="width: 60px; height: 60px;">
+                                              <i class="fas fa-user text-muted"></i>
+                                            </div>
+                                          {% endif %}
+                                        </div>
+
+                                        <!-- Info -->
+                                        <div class="col-md-8">
+                                          <h6 class="mb-1">
+                                            <a href="{% url 'accounts.profile_detail' username=p.user.username %}"
+                                              class="text-decoration-none">
+                                              {{ p.user.username }}
+                                            </a>
+                                          </h6>
+
+                                          <p class="mb-1 text-muted">{{ p.headline }}</p>
+
+                                          <div class="mb-2">
+                                            {% for skill in p.skills.all %}
+                                              <span class="badge bg-secondary me-1">{{ skill.name }}</span>
+                                            {% endfor %}
+                                          </div>
+                                        </div>
+
+                                        <!-- Buttons -->
+                                        <div class="col-md-2 text-end">
+                                          <a href="{% url 'accounts.profile_detail' username=p.user.username %}"
+                                            class="btn btn-sm btn-outline-primary">View Profile</a>
+
+                                          <a href="{% url 'accounts.start_conversation' p.user.id %}"
+                                            class="btn btn-sm btn-primary mt-1">Message</a>
+
+                                          {% if p.user.email %}
+                                            <a href="mailto:{{ p.user.email }}"
+                                              class="btn btn-sm btn-success mt-1 d-block">
+                                              <i class="fas fa-envelope me-1"></i>Email
+                                            </a>
+                                          {% endif %}
+                                        </div>
+
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              {% endfor %}
+
+                            </div>
+
+    
+                          {% endif %}
+
+                        </div>
+                        {% endif %}
+                      {% endfor %}
+
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
               {% for p in results %}
                 <div class="col-12">
                   <div class="card border">

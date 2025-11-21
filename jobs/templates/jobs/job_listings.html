@@ -2,6 +2,10 @@
 {% block content %}
 {% load static %}
 
+<!-- Leaflet CSS and JS for map functionality -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
 <h1>Job Listings</h1>
 
 <!-- Filter form -->
@@ -77,18 +81,24 @@
                         <input type="number" name="salary" step="0.01" class="form-control" id="salary"></p>
 
                         <p><label for="location">Location (optional):</label>
-                        <input type="text" name="location" class="form-control" id="location"></p>
+                        <input type="text" name="location" class="form-control" id="location" placeholder="e.g., Atlanta, GA"></p>
 
-                        <div class="row">
-                          <div class="col-md-6">
-                            <label for="latitude">Latitude (optional):</label>
-                            <input type="number" name="latitude" step="0.000001" class="form-control" id="latitude">
-                          </div>
-                          <div class="col-md-6">
-                            <label for="longitude">Longitude (optional):</label>
-                            <input type="number" name="longitude" step="0.000001" class="form-control" id="longitude">
-                          </div>
-                        </div>
+                        <p>
+                            <label>Pin Office Location on Map:</label>
+                            <small class="text-muted d-block mb-2">Click on the map to set the exact office location</small>
+                            <div id="job-location-map" style="height: 400px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 10px;"></div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="latitude">Latitude:</label>
+                                    <input type="number" name="latitude" step="0.000001" class="form-control" id="latitude" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="longitude">Longitude:</label>
+                                    <input type="number" name="longitude" step="0.000001" class="form-control" id="longitude" readonly>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="clear-location">Clear Location</button>
+                        </p>
 
 
                         <p><label for="remote_or_on_site">Remote / On-site:</label>
@@ -117,8 +127,58 @@
 
 <!-- Job listings -->
 <div class="job-listings">
-    {% if template_data.jobs %}
-        {% for job in template_data.jobs %}
+    {% if template_data.recommended_jobs %}
+    <h2>Recommended Based on Your Skills</h2>
+        {% for job in template_data.recommended_jobs %}
+            <div class="card mb-2 p-3" style="border: 2px solid gold;">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h3>{{ job.title }}</h3>
+                        <p><strong>Skills:</strong> {{ job.skills }}</p>
+                        <p><strong>Location:</strong> {{ job.location|default:"Not specified" }}</p>
+                        <p><strong>Remote/On-site:</strong> {{ job.remote_or_on_site|capfirst }}</p>
+                        <p><strong>Visa Sponsorship:</strong> {{ job.visa_sponsorship|capfirst }}</p>
+                        <p><strong>Salary:</strong>
+                            {% if job.salary %} ${{ job.salary }} {% else %} Not listed {% endif %}
+                        </p>
+                        <p><strong>Posted by:</strong> {{ job.posted_by.username }}</p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <!-- Action buttons based on user role -->
+                        {% if user.is_authenticated and user.role == 'recruiter' and job.posted_by == user %}
+                            <a href="{% url 'jobs.edit_job' job_id=job.id %}" class="btn btn-secondary mb-2">Edit</a>
+                            <a href="{% url 'jobs.delete_job' job_id=job.id %}" class="btn btn-danger mb-2">Delete</a>
+                        {% elif user.is_authenticated and user.role == 'seeker' %}
+                            <div class="d-flex flex-column gap-2">
+                                {% if job.id in template_data.user_saved_jobs %}
+                                    <a href="{% url 'jobs.toggle_save' job_id=job.id %}" class="btn btn-warning btn-sm">
+                                        <i class="fas fa-bookmark"></i> Saved
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'jobs.toggle_save' job_id=job.id %}" class="btn btn-outline-warning btn-sm">
+                                        <i class="far fa-bookmark"></i> Save
+                                    </a>
+                                {% endif %}
+                                {% if job.id in template_data.user_applications %}
+                                    <span class="badge bg-success fs-6">Already Applied</span>
+                                    <a href="{% url 'jobs.track_status' job_id=job.id %}" class="btn btn-info btn-sm">Track Status</a>
+                                {% else %}
+                                    <a href="{% url 'jobs.apply' job_id=job.id %}" class="btn btn-primary btn-sm">Apply Now</a>
+                                {% endif %}
+                            </div>
+                        {% elif not user.is_authenticated %}
+                            <a href="{% url 'accounts.login' %}" class="btn btn-outline-primary mb-2">Login to Apply</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    {% endif %}
+    {% if template_data.other_jobs %}
+        {% if template_data.recommended_jobs %}
+            <h2>Other Jobs</h2>
+        {% endif %}
+        {% for job in template_data.other_jobs %}
             <div class="card mb-2 p-3">
                 <div class="row">
                     <div class="col-md-8">
@@ -162,16 +222,86 @@
                 </div>
             </div>
         {% endfor %}
-    {% else %}
+    {% endif %}
+    {% if not template_data.other_jobs and not template_data.recommended_jobs %}
         <div class="text-center mt-5">
-            <h3>No job postings available.</h3>
-            {% if user.is_authenticated and user.role == 'recruiter' %}
-                <p>Create your first job posting using the form above!</p>
+            {% if template_data.filter_applied %}
+                <h3>No job postings matched your filters.</h3>
             {% else %}
-                <p>Check back later for new opportunities.</p>
+                <h3>No job postings available.</h3>
+                {% if user.is_authenticated and user.role == 'recruiter' %}
+                    <p>Create your first job posting using the form above!</p>
+                {% else %}
+                    <p>Check back later for new opportunities.</p>
+                {% endif %}
             {% endif %}
         </div>
     {% endif %}
 </div>
+
+{% if user.is_authenticated and user.role == 'recruiter' %}
+<script>
+// Initialize map for job location pinning
+let jobLocationMap, locationMarker;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize map centered on a default location (e.g., Atlanta, GA)
+    jobLocationMap = L.map('job-location-map').setView([33.7756, -84.3963], 10);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 20,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(jobLocationMap);
+    
+    // Add click handler to pin location
+    jobLocationMap.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        
+        // Update input fields
+        document.getElementById('latitude').value = lat.toFixed(6);
+        document.getElementById('longitude').value = lng.toFixed(6);
+        
+        // Remove existing marker if any
+        if (locationMarker) {
+            jobLocationMap.removeLayer(locationMarker);
+        }
+        
+        // Add new marker
+        locationMarker = L.marker([lat, lng], {
+            draggable: true,
+            title: 'Office Location'
+        }).addTo(jobLocationMap)
+          .bindPopup('Office Location<br>Drag to adjust').openPopup();
+        
+        // Update coordinates when marker is dragged
+        locationMarker.on('dragend', function(e) {
+            const pos = locationMarker.getLatLng();
+            document.getElementById('latitude').value = pos.lat.toFixed(6);
+            document.getElementById('longitude').value = pos.lng.toFixed(6);
+        });
+    });
+    
+    // Clear location button
+    document.getElementById('clear-location').addEventListener('click', function() {
+        if (locationMarker) {
+            jobLocationMap.removeLayer(locationMarker);
+            locationMarker = null;
+        }
+        document.getElementById('latitude').value = '';
+        document.getElementById('longitude').value = '';
+    });
+    
+    // Try to get user's location and center map
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            jobLocationMap.setView([lat, lng], 12);
+        });
+    }
+});
+</script>
+{% endif %}
 
 {% endblock content %}

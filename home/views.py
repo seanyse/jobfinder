@@ -20,13 +20,13 @@ def about(request):
     template_data['title'] = 'About'
     return render(request, 'home/about.html', {'template_data': template_data})
 
-@user_passes_test(is_seeker)
 def jobs_map(request):
     """
     Page with the interactive map. The browser will ask for the user's location,
     center the map, and fetch markers from /api/jobs/.
+    Accessible to both job seekers and recruiters.
     """
-    # Get user's preferred commute radius from their profile
+    # Get user's preferred commute radius from their profile (for seekers)
     preferred_radius = 50  # default
     if request.user.is_authenticated and hasattr(request.user, 'profile'):
         preferred_radius = request.user.profile.commute_radius
@@ -48,12 +48,9 @@ def _haversine_km(lat1, lon1, lat2, lon2):
     
 def jobs_geojson(request):
     # /api/jobs/?lat=33.7756&lng=-84.3963&radius_km=50
-    # Check if user is authenticated and is a seeker
+    # Check if user is authenticated
     if not request.user.is_authenticated:
         return JsonResponse({"error": "Authentication required"}, status=401)
-    
-    if not is_seeker(request.user):
-        return JsonResponse({"error": "Access denied. Job seekers only."}, status=403)
     
     try:
         lat = float(request.GET.get("lat"))
