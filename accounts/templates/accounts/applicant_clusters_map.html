@@ -1,0 +1,243 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+<div class="container my-4">
+  <h1 class="mb-3">Applicant Clusters by Location</h1>
+  <p class="text-muted mb-4">View clusters of applicants who have applied to your jobs. Clusters are defined by a 50-mile radius and show areas with more than 1 applicant.</p>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-9">
+      <div id="map" style="height: 600px; border-radius: 12px; border:1px solid #ddd;"></div>
+    </div>
+    <div class="col-12 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <h5>Cluster Information</h5>
+          <div id="results" style="max-height: 500px; overflow:auto;">
+            <p class="text-muted">Loading clusters...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL = "{% url 'accounts.applicant_clusters_api' %}";
+
+let map, clustersLayer;
+
+function initMap(lat=39.8283, lng=-98.5795, zoom=4) {
+  map = L.map('map').setView([lat, lng], zoom);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 20,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+  clustersLayer = L.layerGroup().addTo(map);
+}
+
+function setLoading(on) {
+  const r = document.getElementById('results');
+  if (on) {
+    r.innerHTML = '<p class="text-muted">Loading clusters...</p>';
+  }
+}
+
+async function loadClusters() {
+  clustersLayer.clearLayers();
+  setLoading(true);
+
+  try {
+    const resp = await fetch(API_URL, { 
+      headers: { 
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      } 
+    });
+    
+    if (!resp.ok) {
+      if (resp.status === 401) {
+        throw new Error('Please log in to view applicant clusters');
+      } else if (resp.status === 403) {
+        throw new Error('This feature is only available for recruiters');
+      } else {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+    }
+    
+    let data;
+    try {
+      data = await resp.json();
+    } catch (e) {
+      console.error('Failed to parse JSON response:', e);
+      throw new Error('Server returned invalid response');
+    }
+    
+    // Check if there's an error in the response
+    if (data.error) {
+      console.error('Server error:', data.error);
+      if (data.traceback) {
+        console.error('Traceback:', data.traceback);
+      }
+      throw new Error(`Server error: ${data.error}`);
+    }
+    
+    let clusters = [];
+    
+    // Log debug information if available
+    if (data.debug) {
+      console.log('Debug info:', data.debug);
+    }
+    
+    if (Array.isArray(data?.features)) {
+      clusters = data.features.map(f => {
+        const coords = f?.geometry?.coordinates || [];
+        const props = f?.properties || {};
+        return {
+          lat: Number(coords[1]),
+          lng: Number(coords[0]),
+          count: props.count || 0,
+          applicants: props.applicants || [],
+        };
+      });
+    }
+    
+    renderClusters(clusters, data.debug);
+  } catch (err) {
+    console.error('Error loading clusters:', err);
+    let errorMsg = String(err);
+    
+    // Try to get more details from the response if available
+    if (err.message && err.message.includes('Server error:')) {
+      errorMsg = err.message;
+    }
+    
+    document.getElementById('results').innerHTML =
+      `<div class="text-danger">
+        <strong>Error loading clusters:</strong><br>
+        ${errorMsg}<br>
+        <small class="text-muted">Check the browser console (F12) for more details.</small>
+      </div>`;
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderClusters(clusters, debugInfo) {
+  const results = document.getElementById('results');
+  results.innerHTML = '';
+  
+  if (!clusters.length) {
+    let message = '<p class="text-muted">No clusters found. Clusters require more than 1 applicant within a 50-mile radius.</p>';
+    
+    if (debugInfo) {
+      message += '<div class="mt-3 p-2 bg-light rounded small">';
+      message += '<strong>Debug Information:</strong><br>';
+      message += `Total applications: ${debugInfo.total_applications}<br>`;
+      message += `Unique applicants: ${debugInfo.unique_applicants}<br>`;
+      message += `Applicants with coordinates: ${debugInfo.applicants_with_coords}<br>`;
+      message += `Total clusters: ${debugInfo.total_clusters}<br>`;
+      message += `Valid clusters (2+ applicants): ${debugInfo.valid_clusters}<br>`;
+      message += `Jobs posted by you: ${debugInfo.recruiter_jobs_count}<br>`;
+      message += '</div>';
+      
+      if (debugInfo.recruiter_jobs_count === 0) {
+        message += '<p class="text-warning mt-2"><small>You need to post jobs first for applicants to appear.</small></p>';
+      } else if (debugInfo.total_applications === 0) {
+        message += '<p class="text-warning mt-2"><small>No one has applied to your jobs yet.</small></p>';
+      } else if (debugInfo.applicants_with_coords === 0) {
+        message += '<p class="text-warning mt-2"><small>Applicants need to set their location on the map in their profile.</small></p>';
+      } else if (debugInfo.applicants_with_coords === 1) {
+        message += '<p class="text-warning mt-2"><small>Only 1 applicant has coordinates. Clusters require at least 2 applicants within 50 miles.</small></p>';
+      }
+    }
+    
+    results.innerHTML = message;
+    return;
+  }
+
+  // Sort clusters by count (descending)
+  clusters.sort((a, b) => b.count - a.count);
+
+  clusters.forEach(cluster => {
+    if (cluster.lat == null || cluster.lng == null) return;
+
+    // Create a circle marker for the cluster
+    // Size the circle based on the number of applicants (radius in meters)
+    const baseRadius = 10000; // 10km base radius
+    const radius = Math.min(baseRadius * Math.sqrt(cluster.count), 50000); // Max 50km radius
+    
+    const circle = L.circle([cluster.lat, cluster.lng], {
+      radius: radius,
+      color: '#dc3545',
+      fillColor: '#dc3545',
+      fillOpacity: 0.3,
+      weight: 2
+    }).addTo(clustersLayer);
+
+    // Create popup content
+    const applicantList = cluster.applicants.slice(0, 10).map(a => `• ${a}`).join('<br>');
+    const moreText = cluster.applicants.length > 10 ? `<br><em>...and ${cluster.applicants.length - 10} more</em>` : '';
+    
+    circle.bindPopup(`
+      <div style="min-width:220px">
+        <h6><strong>Cluster: ${cluster.count} Applicants</strong></h6>
+        <hr style="margin:8px 0"/>
+        <div style="font-size: 0.9rem;">
+          <strong>Applicants in this cluster:</strong><br>
+          ${applicantList}${moreText}
+        </div>
+      </div>
+    `);
+
+    // Add to sidebar
+    const item = document.createElement('div');
+    item.className = 'mb-3 p-2 border rounded';
+    item.style.cursor = 'pointer';
+    item.innerHTML = `
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <strong>${cluster.count} Applicant${cluster.count > 1 ? 's' : ''}</strong>
+          <div style="font-size:0.85rem; color: #6c757d; margin-top: 4px;">
+            ${cluster.applicants.slice(0, 3).join(', ')}${cluster.applicants.length > 3 ? '...' : ''}
+          </div>
+        </div>
+        <span class="badge bg-danger">${cluster.count}</span>
+      </div>
+    `;
+    
+    item.onclick = () => {
+      map.setView([cluster.lat, cluster.lng], 10);
+      circle.openPopup();
+    };
+    
+    item.onmouseenter = () => {
+      item.style.backgroundColor = '#f8f9fa';
+    };
+    
+    item.onmouseleave = () => {
+      item.style.backgroundColor = '';
+    };
+    
+    results.appendChild(item);
+  });
+
+  // Fit map to show all clusters
+  if (clusters.length > 0) {
+    const bounds = clusters.map(c => [c.lat, c.lng]);
+    map.fitBounds(bounds, { padding: [50, 50] });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  loadClusters();
+});
+</script>
+
+{% endblock content %}
+

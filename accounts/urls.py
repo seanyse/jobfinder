@@ -24,4 +24,8 @@ urlpatterns = [
     path('messages/<int:conversation_id>/', views.conversation_detail, name='accounts.conversation_detail'),
     path('messages/start/<int:candidate_id>/', views.start_conversation, name='accounts.start_conversation'),
     path('messages/start/<int:candidate_id>/job/<int:job_id>/', views.start_conversation_with_job, name='accounts.start_conversation_with_job'),
+    
+    # Applicant clusters map URLs
+    path('recruiter/applicant-clusters/', views.applicant_clusters_map, name='accounts.applicant_clusters_map'),
+    path('api/applicant-clusters/', views.applicant_clusters_api, name='accounts.applicant_clusters_api'),
 ]

@@ -39,6 +39,8 @@ class Profile(models.Model):
     headline = models.CharField(max_length=140)
     bio = models.TextField(blank=True)
     location = models.CharField(max_length=120, blank=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Latitude for location mapping")
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Longitude for location mapping")
     website = models.URLField(blank=True)
     github = models.URLField(blank=True)
     linkedin = models.URLField(blank=True)

@@ -1,7 +1,29 @@
 {% extends "base.html" %}
+{% load static %}
 {% block content %}
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
 <div class="container py-4">
   <h2 class="mb-3">My Profile</h2>
+  
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+  
+  {% if form.errors %}
+    <div class="alert alert-danger">
+      <strong>Form errors:</strong>
+      {{ form.errors }}
+    </div>
+  {% endif %}
+  
   <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
     {% csrf_token %}
 
@@ -29,6 +51,23 @@
             <div class="row">
               <div class="col-md-6 mb-3">{{ form.location.label_tag }} {{ form.location }}</div>
               <div class="col-md-6 mb-3">{{ form.website.label_tag }} {{ form.website }}</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Set Your Location on Map</label>
+              <p class="text-muted small">Click on the map to set your location. This helps recruiters see where applicants are located.</p>
+              <div id="location-map" style="height: 300px; border-radius: 8px; border: 1px solid #ddd;"></div>
+              <div class="mt-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="clear-location">Clear Location</button>
+                <span id="location-status" class="ms-2 text-muted small"></span>
+              </div>
+              {% if form.instance.latitude != None and form.instance.longitude != None %}
+                <!-- Explicitly set values for hidden fields -->
+                <input type="hidden" name="latitude" id="id_latitude" value="{{ form.instance.latitude }}">
+                <input type="hidden" name="longitude" id="id_longitude" value="{{ form.instance.longitude }}">
+              {% else %}
+                {{ form.latitude }}
+                {{ form.longitude }}
+              {% endif %}
             </div>
             <div class="row">
               <div class="col-md-6 mb-3">{{ form.github.label_tag }} {{ form.github }}</div>
@@ -109,7 +148,7 @@
                   {% if f.id.value %}<input type="hidden" name="{{ f.id.html_name }}" value="{{ f.id.value }}">{% endif %}
                   {% if project_formset.can_delete %}
                     <button type="button" class="btn btn-sm btn-outline-danger remove-project">Remove Project</button>
-                    <span style="display:none;">{{ f.DELETE }}</span>
+                    <input type="checkbox" name="{{ f.DELETE.html_name }}" id="{{ f.DELETE.id_for_label }}" style="display:none;">
                   {% endif %}
                 </div>
               {% endfor %}
@@ -141,7 +180,7 @@
                   {% if f.id.value %}<input type="hidden" name="{{ f.id.html_name }}" value="{{ f.id.value }}">{% endif %}
                   {% if education_formset.can_delete %}
                     <button type="button" class="btn btn-sm btn-outline-danger remove-education">Remove Education</button>
-                    <span style="display:none;">{{ f.DELETE }}</span>
+                    <input type="checkbox" name="{{ f.DELETE.html_name }}" id="{{ f.DELETE.id_for_label }}" style="display:none;">
                   {% endif %}
                 </div>
               {% endfor %}
@@ -165,7 +204,7 @@
                   {% if f.id.value %}<input type="hidden" name="{{ f.id.html_name }}" value="{{ f.id.value }}">{% endif %}
                   {% if work_formset.can_delete %}
                     <button type="button" class="btn btn-sm btn-outline-danger remove-work">Remove Work Experience</button>
-                    <span style="display:none;">{{ f.DELETE }}</span>
+                    <input type="checkbox" name="{{ f.DELETE.html_name }}" id="{{ f.DELETE.id_for_label }}" style="display:none;">
                   {% endif %}
                 </div>
               {% endfor %}
@@ -284,6 +323,148 @@
         }
       }
     });
+  })();
+
+  // Location Map Picker
+  (function() {
+    const mapDiv = document.getElementById('location-map');
+    if (!mapDiv) return;
+
+    let locationMap, locationMarker;
+    const latInput = document.querySelector('#id_latitude');
+    const lngInput = document.querySelector('#id_longitude');
+    const statusSpan = document.getElementById('location-status');
+    const clearBtn = document.getElementById('clear-location');
+    
+    // Log for debugging
+    if (latInput && lngInput) {
+      console.log('Latitude input value:', latInput.value);
+      console.log('Longitude input value:', lngInput.value);
+    }
+
+    // Initialize map
+    const initialLat = latInput && latInput.value ? parseFloat(latInput.value) : 39.8283;
+    const initialLng = lngInput && lngInput.value ? parseFloat(lngInput.value) : -98.5795;
+    const initialZoom = (latInput && latInput.value) ? 10 : 4;
+
+    locationMap = L.map('location-map').setView([initialLat, initialLng], initialZoom);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 20,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(locationMap);
+
+    // Function to create/update marker with popup
+    function createOrUpdateMarker(lat, lng) {
+      if (locationMarker) {
+        locationMarker.setLatLng([lat, lng]);
+      } else {
+        // Create a custom icon for the location pin
+        const locationIcon = L.icon({
+          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41]
+        });
+        
+        locationMarker = L.marker([lat, lng], {
+          draggable: true,
+          icon: locationIcon
+        }).addTo(locationMap);
+        
+        // Add drag handler
+        locationMarker.on('dragend', function(e) {
+          const pos = locationMarker.getLatLng();
+          if (latInput) latInput.value = pos.lat.toFixed(6);
+          if (lngInput) lngInput.value = pos.lng.toFixed(6);
+          updateStatus(pos.lat, pos.lng);
+          updateMarkerPopup(pos.lat, pos.lng);
+        });
+      }
+      updateMarkerPopup(lat, lng);
+    }
+    
+    // Function to update marker popup
+    function updateMarkerPopup(lat, lng) {
+      if (locationMarker) {
+        locationMarker.bindPopup(`
+          <div style="text-align: center;">
+            <strong>Your Location</strong><br>
+            Latitude: ${lat.toFixed(6)}<br>
+            Longitude: ${lng.toFixed(6)}
+          </div>
+        `).openPopup();
+      }
+    }
+
+    // Add existing marker if coordinates exist (saved location)
+    if (latInput && latInput.value && lngInput && lngInput.value) {
+      const lat = parseFloat(latInput.value);
+      const lng = parseFloat(lngInput.value);
+      createOrUpdateMarker(lat, lng);
+      locationMap.setView([lat, lng], 12); // Zoom in closer to show the saved location
+      updateStatus(lat, lng);
+      // Show popup after a short delay to ensure map is fully loaded
+      setTimeout(() => {
+        if (locationMarker) {
+          locationMarker.openPopup();
+        }
+      }, 500);
+    } else {
+      // No saved location
+      if (statusSpan) {
+        statusSpan.textContent = 'No location set. Click on the map to set your location.';
+        statusSpan.style.color = '#6c757d';
+      }
+    }
+
+    // Handle map click
+    locationMap.on('click', function(e) {
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+
+      if (latInput) latInput.value = lat.toFixed(6);
+      if (lngInput) lngInput.value = lng.toFixed(6);
+
+      createOrUpdateMarker(lat, lng);
+      updateStatus(lat, lng);
+    });
+
+    // Clear location button
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function() {
+        if (locationMarker) {
+          locationMap.removeLayer(locationMarker);
+          locationMarker = null;
+        }
+        if (latInput) latInput.value = '';
+        if (lngInput) lngInput.value = '';
+        if (statusSpan) statusSpan.textContent = 'No location set';
+        locationMap.setView([39.8283, -98.5795], 4);
+      });
+    }
+
+    function updateStatus(lat, lng) {
+      if (statusSpan) {
+        statusSpan.innerHTML = `<strong>Saved Location:</strong> ${lat.toFixed(6)}, ${lng.toFixed(6)} <i class="fas fa-map-marker-alt text-primary"></i>`;
+        statusSpan.style.color = '#28a745';
+      }
+    }
+
+    // Try to get user's current location
+    if (navigator.geolocation && !latInput.value) {
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          locationMap.setView([lat, lng], 10);
+        },
+        function() {
+          // User denied or error getting location, keep default view
+        }
+      );
+    }
   })();
 </script>
 {% endblock %}

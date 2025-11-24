@@ -242,11 +242,106 @@ def manage_applications(request):
 
 @login_required
 @user_passes_test(is_recruiter)
+def pipeline(request, job_id=None):
+    """
+    Kanban board view for managing applications in a pipeline.
+    If job_id is provided, shows applications for that specific job.
+    Otherwise, shows all applications for all jobs posted by the recruiter.
+    """
+    # Get all jobs posted by this recruiter
+    recruiter_jobs = Job.objects.filter(posted_by=request.user)
+    
+    # If a specific job is selected, filter to that job
+    selected_job = None
+    if job_id:
+        selected_job = get_object_or_404(Job, id=job_id, posted_by=request.user)
+        applications = Application.objects.filter(job=selected_job).select_related('applicant', 'job').prefetch_related('applicant__profile__skills')
+    else:
+        # Show all applications for all jobs
+        applications = Application.objects.filter(job__in=recruiter_jobs).select_related('applicant', 'job').prefetch_related('applicant__profile__skills')
+    
+    # Organize applications by status
+    status_columns = {
+        'applied': [],
+        'review': [],
+        'interview': [],
+        'offer': [],
+        'closed': []
+    }
+    
+    for app in applications:
+        if app.status in status_columns:
+            status_columns[app.status].append(app)
+    
+    # Get job statistics
+    job_stats = {}
+    for job in recruiter_jobs:
+        job_apps = Application.objects.filter(job=job)
+        job_stats[job.id] = {
+            'total': job_apps.count(),
+            'by_status': {}
+        }
+        for status_code, status_label in Application.STATUS_CHOICES:
+            job_stats[job.id]['by_status'][status_code] = job_apps.filter(status=status_code).count()
+    
+    template_data = {
+        'title': 'Application Pipeline',
+        'status_columns': status_columns,
+        'status_choices': Application.STATUS_CHOICES,
+        'recruiter_jobs': recruiter_jobs,
+        'selected_job': selected_job,
+        'job_stats': job_stats,
+    }
+    
+    return render(request, 'jobs/pipeline.html', {'template_data': template_data})
+
+@login_required
+@user_passes_test(is_recruiter)
+def application_detail(request, application_id):
+    """
+    View application details for recruiters with ability to move to next/previous stages
+    """
+    application = get_object_or_404(Application, id=application_id)
+    
+    # Ensure the recruiter owns the job
+    if application.job.posted_by != request.user:
+        messages.error(request, 'You can only view applications for your own job postings.')
+        return redirect('jobs.pipeline')
+    
+    # Get applicant profile if available
+    applicant_profile = None
+    try:
+        applicant_profile = application.applicant.profile
+    except:
+        pass
+    
+    # Get status flow for navigation
+    status_flow = [choice[0] for choice in Application.STATUS_CHOICES]
+    current_index = status_flow.index(application.status) if application.status in status_flow else 0
+    next_status = status_flow[current_index + 1] if current_index < len(status_flow) - 1 else None
+    prev_status = status_flow[current_index - 1] if current_index > 0 else None
+    
+    template_data = {
+        'title': f'Application Details - {application.applicant.username}',
+        'application': application,
+        'applicant_profile': applicant_profile,
+        'status_choices': Application.STATUS_CHOICES,
+        'next_status': next_status,
+        'prev_status': prev_status,
+        'current_status_index': current_index,
+    }
+    
+    return render(request, 'jobs/application_detail.html', {'template_data': template_data})
+
+@login_required
+@user_passes_test(is_recruiter)
 def update_application_status(request, application_id):
     application = get_object_or_404(Application, id=application_id)
     
     # Ensure the recruiter owns the job
     if application.job.posted_by != request.user:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'You can only update applications for your own job postings.'}, status=403)
         messages.error(request, 'You can only update applications for your own job postings.')
         return redirect('jobs.manage_applications')
     
@@ -255,11 +350,33 @@ def update_application_status(request, application_id):
         if new_status in dict(Application.STATUS_CHOICES):
             application.status = new_status
             application.save()
+            
+            # Return JSON response for AJAX requests
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'status': application.status,
+                    'status_display': application.get_status_display(),
+                    'message': f'Application status updated to {application.get_status_display()}'
+                })
+            
             messages.success(request, f'Application status updated to {application.get_status_display()}')
+            
+            # Redirect back to application detail if coming from there, otherwise pipeline
+            referer = request.META.get('HTTP_REFERER', '')
+            if 'application_detail' in referer or 'applications/' in referer:
+                return redirect('jobs.application_detail', application_id=application_id)
+            return redirect('jobs.pipeline')
         else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': 'Invalid status selected.'}, status=400)
             messages.error(request, 'Invalid status selected.')
     
-    return redirect('jobs.manage_applications')
+    # Default redirect
+    referer = request.META.get('HTTP_REFERER', '')
+    if 'application_detail' in referer or 'applications/' in referer:
+        return redirect('jobs.application_detail', application_id=application_id)
+    return redirect('jobs.pipeline')
 
 def job_map(request):
     # Get user's preferred commute radius from their profile

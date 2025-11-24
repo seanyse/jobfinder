@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>{{ template_data.title }}</h2>
+    <div>
+      <select id="job-filter" class="form-select form-select-sm" style="width: auto; display: inline-block;">
+        <option value="">All Jobs</option>
+        {% for job in template_data.recruiter_jobs %}
+          <option value="{{ job.id }}" {% if template_data.selected_job and template_data.selected_job.id == job.id %}selected{% endif %}>
+            {{ job.title }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  {% if template_data.selected_job %}
+    <div class="alert alert-info">
+      Showing applications for: <strong>{{ template_data.selected_job.title }}</strong>
+      <a href="{% url 'jobs.pipeline' %}" class="btn btn-sm btn-outline-secondary ms-2">Show All Jobs</a>
+    </div>
+  {% endif %}
+
+  <div class="kanban-board" style="display: flex; gap: 15px; overflow-x: auto; min-height: 600px;">
+    {% for status_code, status_label in template_data.status_choices %}
+      <div class="kanban-column" data-status="{{ status_code }}" style="min-width: 280px; flex: 1; background: #f5f5f5; border-radius: 8px; padding: 15px;">
+        <div class="column-header" style="margin-bottom: 15px;">
+          <h5 style="margin: 0; font-weight: 600; color: #333;">
+            {{ status_label }}
+            <span class="badge bg-secondary" id="count-{{ status_code }}">
+              {% if status_code == 'applied' %}{{ template_data.status_columns.applied|length }}
+              {% elif status_code == 'review' %}{{ template_data.status_columns.review|length }}
+              {% elif status_code == 'interview' %}{{ template_data.status_columns.interview|length }}
+              {% elif status_code == 'offer' %}{{ template_data.status_columns.offer|length }}
+              {% elif status_code == 'closed' %}{{ template_data.status_columns.closed|length }}
+              {% endif %}
+            </span>
+          </h5>
+        </div>
+        <div class="column-body" style="min-height: 500px;" ondrop="drop(event)" ondragover="allowDrop(event)">
+          {% if status_code == 'applied' %}
+            {% for app in template_data.status_columns.applied %}
+              {% include 'jobs/pipeline_card.html' with app=app %}
+            {% empty %}
+              <div class="text-center text-muted" style="padding: 20px;">No applications</div>
+            {% endfor %}
+          {% elif status_code == 'review' %}
+            {% for app in template_data.status_columns.review %}
+              {% include 'jobs/pipeline_card.html' with app=app %}
+            {% empty %}
+              <div class="text-center text-muted" style="padding: 20px;">No applications</div>
+            {% endfor %}
+          {% elif status_code == 'interview' %}
+            {% for app in template_data.status_columns.interview %}
+              {% include 'jobs/pipeline_card.html' with app=app %}
+            {% empty %}
+              <div class="text-center text-muted" style="padding: 20px;">No applications</div>
+            {% endfor %}
+          {% elif status_code == 'offer' %}
+            {% for app in template_data.status_columns.offer %}
+              {% include 'jobs/pipeline_card.html' with app=app %}
+            {% empty %}
+              <div class="text-center text-muted" style="padding: 20px;">No applications</div>
+            {% endfor %}
+          {% elif status_code == 'closed' %}
+            {% for app in template_data.status_columns.closed %}
+              {% include 'jobs/pipeline_card.html' with app=app %}
+            {% empty %}
+              <div class="text-center text-muted" style="padding: 20px;">No applications</div>
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<style>
+  .kanban-board {
+    padding-bottom: 20px;
+  }
+  .kanban-column {
+    border: 2px solid #e0e0e0;
+  }
+  .application-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+    transform: translateY(-2px);
+    transition: all 0.2s;
+  }
+  .application-card.dragging {
+    opacity: 0.5;
+  }
+</style>
+
+<script>
+  // Drag and drop functionality
+  let draggedElement = null;
+
+  function allowDrop(ev) {
+    ev.preventDefault();
+  }
+
+  function drag(ev) {
+    draggedElement = ev.target.closest('.application-card');
+    ev.dataTransfer.setData("text/plain", draggedElement.dataset.applicationId);
+    draggedElement.classList.add('dragging');
+  }
+
+  function drop(ev) {
+    ev.preventDefault();
+    const applicationId = ev.dataTransfer.getData("text/plain");
+    const targetColumn = ev.currentTarget.closest('.kanban-column');
+    const newStatus = targetColumn.dataset.status;
+
+    if (draggedElement) {
+      draggedElement.classList.remove('dragging');
+      
+      // Update status via AJAX
+      updateApplicationStatus(applicationId, newStatus, draggedElement, targetColumn);
+    }
+  }
+
+  function updateApplicationStatus(applicationId, newStatus, cardElement, targetColumn) {
+    const formData = new FormData();
+    formData.append('status', newStatus);
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    fetch(`/jobs/applications/${applicationId}/update/`, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        // Move the card to the new column
+        const columnBody = targetColumn.querySelector('.column-body');
+        cardElement.remove();
+        columnBody.appendChild(cardElement);
+        
+        // Update counts
+        updateColumnCounts();
+        
+        // Show success message
+        showNotification(data.message || 'Application status updated', 'success');
+      } else {
+        showNotification(data.error || 'Failed to update application status', 'error');
+        // Reload page to restore state
+        location.reload();
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      showNotification('An error occurred while updating the application', 'error');
+      location.reload();
+    });
+  }
+
+  function updateColumnCounts() {
+    // Recalculate and update counts for each column
+    document.querySelectorAll('.kanban-column').forEach(column => {
+      const status = column.dataset.status;
+      const count = column.querySelectorAll('.application-card').length;
+      const countBadge = document.getElementById(`count-${status}`);
+      if (countBadge) {
+        countBadge.textContent = count;
+      }
+    });
+  }
+
+  function viewApplication(applicationId) {
+    // Open application detail in a modal or new page
+    window.location.href = `/jobs/applications/${applicationId}/`;
+  }
+
+  function showNotification(message, type) {
+    // Simple notification - you can enhance this with a toast library
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+      ${message}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => {
+      alertDiv.remove();
+    }, 3000);
+  }
+
+  // Job filter functionality
+  document.getElementById('job-filter').addEventListener('change', function() {
+    const jobId = this.value;
+    if (jobId) {
+      window.location.href = `/jobs/pipeline/${jobId}/`;
+    } else {
+      window.location.href = '/jobs/pipeline/';
+    }
+  });
+</script>
+
+{% endblock content %}

@@ -25,6 +25,18 @@ class ProfileForm(forms.ModelForm):
         widget=forms.NumberInput(attrs={'class': 'form-control'}),
         help_text="Preferred commute radius in kilometers"
     )
+    latitude = forms.DecimalField(
+        required=False,
+        max_digits=9,
+        decimal_places=6,
+        widget=forms.HiddenInput()
+    )
+    longitude = forms.DecimalField(
+        required=False,
+        max_digits=9,
+        decimal_places=6,
+        widget=forms.HiddenInput()
+    )
 
     class Meta:
         model = Profile
@@ -33,7 +45,8 @@ class ProfileForm(forms.ModelForm):
             "headline", "bio", "location",
             "website", "github", "linkedin",
             "commute_radius",
-            "skills", "privacy_level"
+            "skills", "privacy_level",
+            "latitude", "longitude"
         ]
         widgets = {"privacy_level": forms.RadioSelect()}
 
@@ -41,6 +54,19 @@ class ProfileForm(forms.ModelForm):
             super().__init__(*args, **kwargs)
             # Force the choices to exactly what's on the model
             self.fields["privacy_level"].choices = Profile.PRIVACY_CHOICES
+            # Ensure latitude/longitude are initialized from instance if available
+            # For hidden fields, we need to set the value directly, not just initial
+            if self.instance and self.instance.pk:
+                if self.instance.latitude is not None:
+                    self.fields["latitude"].initial = str(self.instance.latitude)
+                    # Also set the value if form is not bound (GET request)
+                    if not self.is_bound:
+                        self.initial["latitude"] = str(self.instance.latitude)
+                if self.instance.longitude is not None:
+                    self.fields["longitude"].initial = str(self.instance.longitude)
+                    # Also set the value if form is not bound (GET request)
+                    if not self.is_bound:
+                        self.initial["longitude"] = str(self.instance.longitude)
 
 class ProjectForm(forms.ModelForm):
     class Meta:
@@ -85,8 +111,8 @@ class WorkExperienceForm(forms.ModelForm):
             "description": Textarea(attrs={"class": "form-control"}),
         }
 
-EducationFormSet = formset_factory(EducationForm, extra=0, can_delete=True)
-WorkExperienceFormSet = formset_factory(WorkExperienceForm, extra=0, can_delete=True)
+EducationFormSet = modelformset_factory(Education, form=EducationForm, extra=0, can_delete=True)
+WorkExperienceFormSet = modelformset_factory(WorkExperience, form=WorkExperienceForm, extra=0, can_delete=True)
 
 class CandidateSearchForm(forms.Form):
     skills = forms.ModelMultipleChoiceField(

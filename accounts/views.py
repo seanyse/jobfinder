@@ -1,7 +1,9 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login as auth_login, authenticate, logout as auth_logout, get_user_model
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
+from math import radians, sin, cos, asin, sqrt
+from decimal import InvalidOperation
 from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, MessageForm, ContactCandidateForm, SaveSearchForm
 from .models import Profile, Education, WorkExperience, Conversation, Message, CustomUser, Project, SavedCandidateSearch, SearchMatchNotification
 from .forms import CustomUserCreationForm, ProfileForm, CandidateSearchForm, ProjectFormSet, EducationFormSet, WorkExperienceFormSet, MessageForm
@@ -82,130 +84,158 @@ def profile_edit(request):
         project_formset = ProjectFormSet(request.POST, prefix="projects")
         education_formset = EducationFormSet(request.POST, prefix="education")
         work_formset = WorkExperienceFormSet(request.POST, prefix="work")
-        if form.is_valid() and project_formset.is_valid() and education_formset.is_valid() and work_formset.is_valid():
-            profile = form.save()
+        
+        # Check form validity and log errors if any
+        form_valid = form.is_valid()
+        project_valid = project_formset.is_valid()
+        education_valid = education_formset.is_valid()
+        work_valid = work_formset.is_valid()
+        
+        if not form_valid:
+            messages.error(request, f"Profile form errors: {form.errors}")
+        if not project_valid:
+            messages.error(request, f"Project formset errors: {project_formset.errors}")
+        if not education_valid:
+            messages.error(request, f"Education formset errors: {education_formset.errors}")
+        if not work_valid:
+            messages.error(request, f"Work experience formset errors: {work_formset.errors}")
+        
+        # Always try to save latitude/longitude even if formsets have errors
+        # Get latitude and longitude from POST data
+        lat_value = None
+        lng_value = None
+        
+        if 'latitude' in request.POST:
+            lat_str = request.POST['latitude'].strip()
+            if lat_str:
+                try:
+                    lat_value = float(lat_str)
+                    # Validate latitude range
+                    if -90 <= lat_value <= 90:
+                        pass  # Valid
+                    else:
+                        lat_value = None
+                except (ValueError, TypeError):
+                    lat_value = None
+        
+        if 'longitude' in request.POST:
+            lng_str = request.POST['longitude'].strip()
+            if lng_str:
+                try:
+                    lng_value = float(lng_str)
+                    # Validate longitude range
+                    if -180 <= lng_value <= 180:
+                        pass  # Valid
+                    else:
+                        lng_value = None
+                except (ValueError, TypeError):
+                    lng_value = None
+        
+        if form_valid and project_valid and education_valid and work_valid:
+            # Save form without committing first
+            profile = form.save(commit=False)
+            
+            # Set latitude/longitude on the instance BEFORE saving
+            if lat_value is not None:
+                profile.latitude = lat_value
+            elif 'latitude' in request.POST and not request.POST['latitude'].strip():
+                # Explicitly clear if empty string was sent
+                profile.latitude = None
+                
+            if lng_value is not None:
+                profile.longitude = lng_value
+            elif 'longitude' in request.POST and not request.POST['longitude'].strip():
+                # Explicitly clear if empty string was sent
+                profile.longitude = None
+            
+            # Save the instance (this saves all fields including coordinates)
+            profile.save()
+            
+            # Save ManyToMany fields (skills)
+            form.save_m2m()
+            
             # Add any new skills typed in
             new_skills_csv = form.cleaned_data.get("new_skills") or ""
             for skill_name in [s.strip() for s in new_skills_csv.split(',') if s.strip()]:
                 skill_obj, _ = Profile._meta.get_field('skills').remote_field.model.objects.get_or_create(name=skill_name)
                 profile.skills.add(skill_obj)
 
-            # Handle projects from formset
+            # Handle projects from formset - always create new instances to avoid sharing
             profile.projects.clear()
-            for i, f in enumerate(project_formset):
-                if f.cleaned_data:
-                    delete_key = f'projects-{i}-DELETE'
-                    is_deleted = request.POST.get(delete_key) == 'on'
-                    if not is_deleted:
-                        project_id = None
-                        for key, value in request.POST.items():
-                            if key.startswith(f'projects-{i}-') and key.endswith('-id') and value:
-                                project_id = value
-                                break
-                        if project_id:
-                            try:
-                                existing_project = Project.objects.get(id=project_id)
-                                existing_project.title = f.cleaned_data['title']
-                                existing_project.url = f.cleaned_data['url']
-                                existing_project.description = f.cleaned_data['description']
-                                existing_project.save()
-                                profile.projects.add(existing_project)
-                            except Project.DoesNotExist:
-                                pass
-                        else:
-                            proj = f.save()
-                            profile.projects.add(proj)
+            for f in project_formset:
+                if f.cleaned_data and not f.cleaned_data.get('DELETE', False):
+                    # Always create a new project instance for this profile
+                    proj = Project.objects.create(
+                        title=f.cleaned_data.get('title', ''),
+                        url=f.cleaned_data.get('url', ''),
+                        description=f.cleaned_data.get('description', '')
+                    )
+                    profile.projects.add(proj)
 
-            # Handle education from formset
+            # Handle education from formset - always create new instances to avoid sharing
             profile.education.clear()
-            for i, f in enumerate(education_formset):
-                if f.cleaned_data:
-                    delete_key = f'education-{i}-DELETE'
-                    is_deleted = request.POST.get(delete_key) == 'on'
-                    if not is_deleted:
-                        education_id = None
-                        for key, value in request.POST.items():
-                            if key.startswith(f'education-{i}-') and key.endswith('-id') and value:
-                                education_id = value
-                                break
-                        if education_id:
-                            try:
-                                existing_education = Education.objects.get(id=education_id)
-                                existing_education.school = f.cleaned_data['school']
-                                existing_education.graduation_month = f.cleaned_data['graduation_month']
-                                existing_education.graduation_year = f.cleaned_data['graduation_year']
-                                existing_education.major = f.cleaned_data['major']
-                                existing_education.degree = f.cleaned_data['degree']
-                                existing_education.save()
-                                profile.education.add(existing_education)
-                            except Education.DoesNotExist:
-                                pass
-                        else:
-                            edu = f.save()
-                            profile.education.add(edu)
+            for f in education_formset:
+                if f.cleaned_data and not f.cleaned_data.get('DELETE', False):
+                    # Always create a new education instance for this profile
+                    edu = Education.objects.create(
+                        school=f.cleaned_data.get('school', ''),
+                        graduation_month=f.cleaned_data.get('graduation_month', 1),
+                        graduation_year=f.cleaned_data.get('graduation_year', 2024),
+                        major=f.cleaned_data.get('major', ''),
+                        degree=f.cleaned_data.get('degree', '')
+                    )
+                    profile.education.add(edu)
 
-            # Handle work experience from formset
+            # Handle work experience from formset - always create new instances to avoid sharing
             profile.work_experience.clear()
-            for i, f in enumerate(work_formset):
-                if f.cleaned_data:
-                    delete_key = f'work-{i}-DELETE'
-                    is_deleted = request.POST.get(delete_key) == 'on'
-                    if not is_deleted:
-                        work_id = None
-                        for key, value in request.POST.items():
-                            if key.startswith(f'work-{i}-') and key.endswith('-id') and value:
-                                work_id = value
-                                break
-                        if work_id:
-                            try:
-                                existing_work = WorkExperience.objects.get(id=work_id)
-                                existing_work.company = f.cleaned_data['company']
-                                existing_work.description = f.cleaned_data['description']
-                                existing_work.save()
-                                profile.work_experience.add(existing_work)
-                            except WorkExperience.DoesNotExist:
-                                pass
-                        else:
-                            work = f.save()
-                            profile.work_experience.add(work)
-
-            return redirect("accounts.profile_detail", username=request.user.username)
+            for f in work_formset:
+                if f.cleaned_data and not f.cleaned_data.get('DELETE', False):
+                    # Always create a new work experience instance for this profile
+                    work = WorkExperience.objects.create(
+                        company=f.cleaned_data.get('company', ''),
+                        description=f.cleaned_data.get('description', '')
+                    )
+                    profile.work_experience.add(work)
+            
+            messages.success(request, "Profile saved successfully!")
+            # Refresh profile from database to ensure we have the latest data
+            profile.refresh_from_db()
+            return redirect("accounts.profile_edit")
     else:
+        # Refresh profile from database to ensure we have the latest data
+        profile.refresh_from_db()
+        # Explicitly reload related objects
+        profile = Profile.objects.select_related('user').prefetch_related('projects', 'education', 'work_experience', 'skills').get(pk=profile.pk)
         form = ProfileForm(instance=profile)
         
-        # Initialize projects formset
-        project_initial = []
-        for p in profile.projects.all():
-            project_initial.append({
-                "title": p.title,
-                "url": p.url,
-                "description": p.description,
-                "id": p.id
-            })
-        project_formset = ProjectFormSet(initial=project_initial, prefix="projects")
+        # Explicitly set initial values for latitude/longitude to ensure they're in the form
+        # Use getattr with default None to handle cases where fields might not exist yet
+        lat_value = getattr(profile, 'latitude', None)
+        lng_value = getattr(profile, 'longitude', None)
+        if lat_value is not None:
+            form.initial['latitude'] = str(lat_value)
+            form.fields['latitude'].initial = str(lat_value)
+        if lng_value is not None:
+            form.initial['longitude'] = str(lng_value)
+            form.fields['longitude'].initial = str(lng_value)
         
-        # Initialize education formset
-        education_initial = []
-        for e in profile.education.all():
-            education_initial.append({
-                "school": e.school,
-                "graduation_month": e.graduation_month,
-                "graduation_year": e.graduation_year,
-                "major": e.major,
-                "degree": e.degree,
-                "id": e.id
-            })
-        education_formset = EducationFormSet(initial=education_initial, prefix="education")
+        # Initialize projects formset with queryset
+        project_formset = ProjectFormSet(
+            queryset=profile.projects.all(),
+            prefix="projects"
+        )
         
-        # Initialize work experience formset
-        work_initial = []
-        for w in profile.work_experience.all():
-            work_initial.append({
-                "company": w.company,
-                "description": w.description,
-                "id": w.id
-            })
-        work_formset = WorkExperienceFormSet(initial=work_initial, prefix="work")
+        # Initialize education formset with queryset
+        education_formset = EducationFormSet(
+            queryset=profile.education.all(),
+            prefix="education"
+        )
+        
+        # Initialize work experience formset with queryset
+        work_formset = WorkExperienceFormSet(
+            queryset=profile.work_experience.all(),
+            prefix="work"
+        )
         
     return render(request, "accounts/profile_form.html", {
         "form": form, 
@@ -226,8 +256,8 @@ def can_view_profile(viewer, profile_owner, profile: Profile) -> bool:
 
 @login_required
 def my_profile(request):
-    # Redirect to profile detail view for the current user
-    return redirect("accounts.profile_detail", username=request.user.username)
+    # Redirect directly to profile edit page
+    return redirect("accounts.profile_edit")
 
 def profile_detail(request, username):
     User = get_user_model()
@@ -267,7 +297,6 @@ def edit_profile(request):
 def candidate_search(request):
     # US-11: recruiter searches candidates
     form = CandidateSearchForm(request.GET or None)
-    results = None
     filters_applied = False
     # Start with all job seekers (users with role='seeker')
     User = get_user_model()
@@ -313,9 +342,10 @@ def candidate_search(request):
             form.cleaned_data.get("project_keyword") or
             (form.cleaned_data.get("skills") and len(form.cleaned_data.get("skills")) > 0)
         )
-    
+
+    # Always set results to the queryset (even if form is not valid, show all results)
     results = qs.distinct()
-    
+
     # candidate recommedation functionality
     matches = {}   # job → list of matching profiles
     if not filters_applied:
@@ -341,8 +371,10 @@ def candidate_search(request):
                 if overlap >= 2:
                     matches[job].append(profile)
 
+    # Only exclude recommended IDs if we have matches
     recommended_ids = [p.id for profiles in matches.values() for p in profiles]
-    results = results.exclude(id__in=recommended_ids)
+    if recommended_ids:
+        results = results.exclude(id__in=recommended_ids)
     has_matches = any(matches.values()) # bool that returns true if there are any candidate recommendations
     return render(request, "accounts/candidate_search.html", {"form": form, "results": results, "users_without_profiles": users_without_profiles, "matches": matches, "has_matches": has_matches})
 
@@ -763,3 +795,176 @@ def contact_candidate(request, username):
         })
 
     return render(request, "accounts/contact_candidate.html", {"form": form, "candidate": candidate})
+
+def is_recruiter(user):
+    return user.is_authenticated and getattr(user, "role", None) == "recruiter"
+
+@user_passes_test(is_recruiter)
+def applicant_clusters_map(request):
+    """
+    Page showing clusters of applicants by location on a map.
+    Only accessible to recruiters.
+    """
+    template_data = {
+        'title': 'Applicant Clusters Map'
+    }
+    return render(request, 'accounts/applicant_clusters_map.html', {'template_data': template_data})
+
+@user_passes_test(is_recruiter)
+def applicant_clusters_api(request):
+    """
+    API endpoint that returns clustered applicant data.
+    Clusters are defined by a 50-mile radius, and a cluster must have more than 1 candidate.
+    """
+    from jobs.models import Application
+    import traceback
+    
+    try:
+        # Get all unique applicants who have applied to jobs posted by this recruiter
+        recruiter_jobs = Job.objects.filter(posted_by=request.user)
+        
+        # Handle case where recruiter has no jobs
+        if not recruiter_jobs.exists():
+            return JsonResponse({
+                "type": "FeatureCollection",
+                "features": [],
+                "debug": {
+                    "total_applications": 0,
+                    "unique_applicants": 0,
+                    "applicants_with_coords": 0,
+                    "total_clusters": 0,
+                    "valid_clusters": 0,
+                    "recruiter_jobs_count": 0
+                }
+            })
+        
+        applications = Application.objects.filter(job__in=recruiter_jobs).select_related('applicant')
+        
+        # Get unique applicants with valid coordinates
+        applicants_with_coords = []
+        seen_applicants = set()
+        
+        for app in applications:
+            applicant = app.applicant
+            if applicant.id in seen_applicants:
+                continue
+            seen_applicants.add(applicant.id)
+            
+            # Check if applicant has a profile with coordinates
+            try:
+                profile = applicant.profile
+            except (Profile.DoesNotExist, AttributeError):
+                continue
+            
+            if profile and hasattr(profile, 'latitude') and hasattr(profile, 'longitude') and profile.latitude is not None and profile.longitude is not None:
+                try:
+                    lat = float(profile.latitude)
+                    lng = float(profile.longitude)
+                    # Validate coordinates are reasonable (latitude: -90 to 90, longitude: -180 to 180)
+                    if -90 <= lat <= 90 and -180 <= lng <= 180:
+                        applicants_with_coords.append({
+                            'id': applicant.id,
+                            'username': applicant.username,
+                            'lat': lat,
+                            'lng': lng,
+                            'location': profile.location or '',
+                        })
+                except (TypeError, ValueError, InvalidOperation):
+                    continue
+        
+        # Cluster applicants by 50-mile radius (approximately 80.47 km)
+        CLUSTER_RADIUS_KM = 80.47  # 50 miles in kilometers
+        
+        def haversine_km(lat1, lon1, lat2, lon2):
+            """Calculate distance between two points in kilometers"""
+            R = 6371.0
+            dlat = radians(lat2 - lat1)
+            dlon = radians(lon2 - lon1)
+            a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+            return 2 * R * asin(sqrt(a))
+        
+        clusters = []
+        
+        for applicant in applicants_with_coords:
+            assigned = False
+            # Check if this applicant belongs to any existing cluster
+            for cluster in clusters:
+                cluster_center_lat = cluster['center_lat']
+                cluster_center_lng = cluster['center_lng']
+                distance = haversine_km(
+                    cluster_center_lat, cluster_center_lng,
+                    applicant['lat'], applicant['lng']
+                )
+                
+                if distance <= CLUSTER_RADIUS_KM:
+                    # Add to existing cluster
+                    cluster['applicants'].append(applicant)
+                    # Update cluster center (average of all points)
+                    total_lat = sum(a['lat'] for a in cluster['applicants'])
+                    total_lng = sum(a['lng'] for a in cluster['applicants'])
+                    count = len(cluster['applicants'])
+                    cluster['center_lat'] = total_lat / count
+                    cluster['center_lng'] = total_lng / count
+                    cluster['count'] = count
+                    assigned = True
+                    break
+            
+            if not assigned:
+                # Create new cluster
+                clusters.append({
+                    'center_lat': applicant['lat'],
+                    'center_lng': applicant['lng'],
+                    'applicants': [applicant],
+                    'count': 1
+                })
+        
+        # Filter clusters to only include those with more than 1 candidate
+        valid_clusters = [c for c in clusters if c['count'] > 1]
+        
+        # Convert to GeoJSON format
+        features = []
+        for cluster in valid_clusters:
+            # Get list of applicant usernames for the popup
+            applicant_names = [a['username'] for a in cluster['applicants']]
+            
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [cluster['center_lng'], cluster['center_lat']]
+                },
+                "properties": {
+                    "count": cluster['count'],
+                    "applicants": applicant_names,
+                    "center_lat": cluster['center_lat'],
+                    "center_lng": cluster['center_lng']
+                }
+            })
+        
+        # Add debug information (can be removed in production)
+        debug_info = {
+            "total_applications": applications.count(),
+            "unique_applicants": len(seen_applicants),
+            "applicants_with_coords": len(applicants_with_coords),
+            "total_clusters": len(clusters),
+            "valid_clusters": len(valid_clusters),
+            "recruiter_jobs_count": recruiter_jobs.count()
+        }
+        
+        return JsonResponse({
+            "type": "FeatureCollection", 
+            "features": features,
+            "debug": debug_info
+        })
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        # Log the error to help with debugging
+        print(f"Error in applicant_clusters_api: {str(e)}")
+        print(error_trace)
+        return JsonResponse({
+            "error": str(e),
+            "traceback": error_trace,
+            "type": "FeatureCollection",
+            "features": []
+        }, status=500)

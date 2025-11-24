@@ -14,6 +14,9 @@ urlpatterns = [
     path('<int:job_id>/track/', views.track_status, name='jobs.track_status'),
     path('my-applications/', views.my_applications, name='jobs.my_applications'),
     path('manage-applications/', views.manage_applications, name='jobs.manage_applications'),
+    path('pipeline/', views.pipeline, name='jobs.pipeline'),
+    path('pipeline/<int:job_id>/', views.pipeline, name='jobs.pipeline_job'),
+    path('applications/<int:application_id>/', views.application_detail, name='jobs.application_detail'),
     path('applications/<int:application_id>/update/', views.update_application_status, name='jobs.update_application_status'),
     
     # Bookmark URLs

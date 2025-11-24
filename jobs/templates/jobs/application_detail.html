@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="mb-3">
+    <a href="{% url 'jobs.pipeline' %}" class="btn btn-outline-secondary">
+      <i class="fas fa-arrow-left"></i> Back to Pipeline
+    </a>
+  </div>
+
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">
+          <h4 class="mb-0">Application Details</h4>
+        </div>
+        <div class="card-body">
+          <div class="mb-4">
+            <h5>Applicant Information</h5>
+            <hr>
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <strong>Name:</strong> {{ template_data.application.applicant.username }}
+              </div>
+              <div class="col-md-6">
+                <strong>Email:</strong> {{ template_data.application.applicant.email }}
+              </div>
+            </div>
+            {% if template_data.applicant_profile %}
+              {% if template_data.applicant_profile.headline %}
+                <div class="mb-3">
+                  <strong>Headline:</strong> {{ template_data.applicant_profile.headline }}
+                </div>
+              {% endif %}
+              {% if template_data.applicant_profile.bio %}
+                <div class="mb-3">
+                  <strong>Bio:</strong>
+                  <p>{{ template_data.applicant_profile.bio }}</p>
+                </div>
+              {% endif %}
+              {% if template_data.applicant_profile.location %}
+                <div class="mb-3">
+                  <strong>Location:</strong> {{ template_data.applicant_profile.location }}
+                </div>
+              {% endif %}
+              {% if template_data.applicant_profile.skills.all %}
+                <div class="mb-3">
+                  <strong>Skills:</strong>
+                  {% for skill in template_data.applicant_profile.skills.all %}
+                    <span class="badge bg-primary">{{ skill.name }}</span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+              {% if template_data.applicant_profile.website %}
+                <div class="mb-3">
+                  <strong>Website:</strong> <a href="{{ template_data.applicant_profile.website }}" target="_blank">{{ template_data.applicant_profile.website }}</a>
+                </div>
+              {% endif %}
+              {% if template_data.applicant_profile.github %}
+                <div class="mb-3">
+                  <strong>GitHub:</strong> <a href="{{ template_data.applicant_profile.github }}" target="_blank">{{ template_data.applicant_profile.github }}</a>
+                </div>
+              {% endif %}
+              {% if template_data.applicant_profile.linkedin %}
+                <div class="mb-3">
+                  <strong>LinkedIn:</strong> <a href="{{ template_data.applicant_profile.linkedin }}" target="_blank">{{ template_data.applicant_profile.linkedin }}</a>
+                </div>
+              {% endif %}
+            {% endif %}
+          </div>
+
+          <div class="mb-4">
+            <h5>Job Information</h5>
+            <hr>
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <strong>Job Title:</strong> {{ template_data.application.job.title }}
+              </div>
+              <div class="col-md-6">
+                <strong>Company:</strong> {{ template_data.application.job.company|default:"Not specified" }}
+              </div>
+            </div>
+            {% if template_data.application.job.location %}
+              <div class="mb-3">
+                <strong>Location:</strong> {{ template_data.application.job.location }}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="mb-4">
+            <h5>Cover Letter</h5>
+            <hr>
+            {% if template_data.application.cover_letter %}
+              <div class="border rounded p-3" style="background: #f8f9fa;">
+                {{ template_data.application.cover_letter|linebreaks }}
+              </div>
+            {% else %}
+              <p class="text-muted">No cover letter provided.</p>
+            {% endif %}
+          </div>
+
+          <div class="mb-4">
+            <h5>Application Timeline</h5>
+            <hr>
+            <div class="row">
+              <div class="col-md-6">
+                <strong>Applied:</strong> {{ template_data.application.applied_at|date:"F d, Y g:i A" }}
+              </div>
+              <div class="col-md-6">
+                <strong>Last Updated:</strong> {{ template_data.application.updated_at|date:"F d, Y g:i A" }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Current Status</h5>
+        </div>
+        <div class="card-body">
+          <div class="text-center mb-4">
+            <span class="badge 
+              {% if template_data.application.status == 'applied' %}bg-primary
+              {% elif template_data.application.status == 'review' %}bg-warning
+              {% elif template_data.application.status == 'interview' %}bg-info
+              {% elif template_data.application.status == 'offer' %}bg-success
+              {% elif template_data.application.status == 'closed' %}bg-secondary
+              {% endif %}" style="font-size: 1.2em; padding: 10px 20px;">
+              {{ template_data.application.get_status_display }}
+            </span>
+          </div>
+
+          <div class="mb-3">
+            <h6>Status Flow</h6>
+            <div class="list-group">
+              {% for status_code, status_label in template_data.status_choices %}
+                <div class="list-group-item {% if status_code == template_data.application.status %}active{% endif %}" 
+                     style="{% if status_code == template_data.application.status %}background-color: #0d6efd; color: white;{% endif %}">
+                  {% if forloop.counter0 < template_data.current_status_index %}
+                    <i class="fas fa-check-circle text-success"></i>
+                  {% elif forloop.counter0 == template_data.current_status_index %}
+                    <i class="fas fa-circle"></i>
+                  {% else %}
+                    <i class="far fa-circle"></i>
+                  {% endif %}
+                  {{ status_label }}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <hr>
+
+          <div class="d-grid gap-2">
+            {% if template_data.prev_status %}
+              <form method="post" action="{% url 'jobs.update_application_status' template_data.application.id %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="status" value="{{ template_data.prev_status }}">
+                <button type="submit" class="btn btn-outline-secondary w-100">
+                  <i class="fas fa-arrow-left"></i> Move to Previous Stage
+                </button>
+              </form>
+            {% endif %}
+
+            {% if template_data.next_status %}
+              <form method="post" action="{% url 'jobs.update_application_status' template_data.application.id %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="status" value="{{ template_data.next_status }}">
+                <button type="submit" class="btn btn-primary w-100">
+                  Move to Next Stage <i class="fas fa-arrow-right"></i>
+                </button>
+              </form>
+            {% endif %}
+
+            <div class="dropdown">
+              <button class="btn btn-outline-primary w-100 dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                Change Status
+              </button>
+              <ul class="dropdown-menu w-100">
+                {% for status_code, status_label in template_data.status_choices %}
+                  {% if status_code != template_data.application.status %}
+                    <li>
+                      <form method="post" action="{% url 'jobs.update_application_status' template_data.application.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="{{ status_code }}">
+                        <button type="submit" class="dropdown-item">{{ status_label }}</button>
+                      </form>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+
+          {% if template_data.applicant_profile %}
+            <hr>
+            <div class="text-center">
+              <a href="{% url 'accounts.profile_detail' template_data.application.applicant.username %}" 
+                 class="btn btn-outline-info w-100" target="_blank">
+                <i class="fas fa-user"></i> View Full Profile
+              </a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
+
